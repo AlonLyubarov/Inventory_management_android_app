@@ -31,6 +31,9 @@ public class ItemViewModel extends AndroidViewModel {
         // We call the repository and pass the userId to get the filtered list
         return mRepository.getAllItems(userId);
     }
+    public LiveData<List<Item>> searchDatabase(String searchQuery) {
+        return mRepository.searchDatabase(searchQuery);
+    }
     /**
      * Wrapper insert method that calls the repository's insert method.
      * This keeps the implementation of the database hidden from the UI.

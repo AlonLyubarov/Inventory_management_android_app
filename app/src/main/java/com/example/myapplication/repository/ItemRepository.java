@@ -52,4 +52,8 @@ public class ItemRepository {
             mItemDao.delete(item);
         });
     }
+
+    public LiveData<List<Item>> searchDatabase(String searchQuery) {
+        return mItemDao.searchDatabase(searchQuery);
+    }
 }

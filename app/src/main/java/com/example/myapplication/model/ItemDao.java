@@ -27,4 +27,7 @@ public interface ItemDao {
 
     @Query("SELECT * FROM items_table WHERE ownerId = :userId ORDER BY name ASC")
     LiveData<List<Item>> getAllItems(String userId);
+
+    @Query("SELECT * FROM items_table WHERE name LIKE :searchQuery")
+    LiveData<List<Item>> searchDatabase(String searchQuery);
       }

@@ -1,6 +1,8 @@
 package com.example.myapplication.view;
-
+import androidx.appcompat.widget.SearchView;
 import android.os.Bundle;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
@@ -17,9 +19,13 @@ import com.example.myapplication.viewmodel.ItemViewModel;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
+import java.util.List;
+
 public class MainActivity extends AppCompatActivity {
 
+    // Global variables (Members) accessible by all methods in this class
     private ItemViewModel itemViewModel;
+    private ItemAdapter adapter;
     private FirebaseAuth mAuth;
 
     @Override
@@ -50,24 +56,21 @@ public class MainActivity extends AppCompatActivity {
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         recyclerView.setHasFixedSize(true);
 
-        final ItemAdapter adapter = new ItemAdapter();
+        // Initialize the global adapter variable
+        adapter = new ItemAdapter();
         recyclerView.setAdapter(adapter);
 
-        // Initialize ViewModel
+        // Initialize the global ViewModel variable
         itemViewModel = new ViewModelProvider(this).get(ItemViewModel.class);
 
-        /**
-         * Observe the LiveData.
-         */
+        // Observe all items for the current user
         itemViewModel.getAllItems(currentUserId).observe(this, items -> {
             if (items != null) {
                 adapter.setItems(items);
             }
         });
 
-        /**
-         * Swipe to Delete functionality.
-         */
+        // Swipe to Delete functionality
         new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(0,
                 ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT) {
             @Override
@@ -86,9 +89,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }).attachToRecyclerView(recyclerView);
 
-        /**
-         * Logic for adding a new item.
-         */
+        // Logic for adding a new item
         buttonAdd.setOnClickListener(v -> {
             String name = editTextName.getText().toString();
             String quantityStr = editTextQuantity.getText().toString();
@@ -103,13 +104,11 @@ public class MainActivity extends AppCompatActivity {
             double price = Double.parseDouble(priceStr);
 
             Item newItem = new Item(name, price, quantity, currentUserId);
-
             itemViewModel.insert(newItem);
 
             editTextName.setText("");
             editTextQuantity.setText("");
             editTextPrice.setText("");
-
             Toast.makeText(this, "Item saved", Toast.LENGTH_SHORT).show();
         });
     }
@@ -117,8 +116,50 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
+        // Check if user is signed in (non-null) and update UI accordingly.
         if (mAuth.getCurrentUser() == null) {
             Toast.makeText(this, "No user logged in", Toast.LENGTH_SHORT).show();
+            // You can also redirect to Login screen here
         }
+    }
+
+    /**
+     * Filters the database based on the search query.
+     */
+    private void searchDatabase(String query) {
+        String searchQuery = "%" + query + "%";
+
+        // Calling the method through the initialized itemViewModel instance
+        itemViewModel.searchDatabase(searchQuery).observe(this, items -> {
+            if (items != null) {
+                adapter.setItems(items);
+            }
+        });
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        // Inflate the menu; this adds items to the action bar if it is present.
+        getMenuInflater().inflate(R.menu.main_menu, menu);
+
+        MenuItem searchItem = menu.findItem(R.id.action_search);
+        androidx.appcompat.widget.SearchView searchView = (androidx.appcompat.widget.SearchView) searchItem.getActionView();
+
+        // Listener for search input changes
+        searchView.setOnQueryTextListener(new androidx.appcompat.widget.SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                return false;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                // Execute search logic on every keystroke
+                searchDatabase(newText);
+                return true;
+            }
+        });
+
+        return true;
     }
 }
