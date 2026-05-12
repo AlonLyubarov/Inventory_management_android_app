@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#F5F5F5"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="סיכום מלאי"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="12dp"
+        android:textColor="@android:color/black"/>
+
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="4dp"
+        android:layout_marginBottom="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <TextView
+                android:id="@+id/text_total_items"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="סהכ פריטים: 0"
+                android:textSize="16sp"
+                android:textColor="@android:color/black"/>
+
+            <TextView
+                android:id="@+id/text_total_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="שווי כולל: ₪0.00"
+                android:textSize="16sp"
+                android:textColor="#2E7D32"
+                android:layout_marginTop="4dp"/>
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <EditText
+        android:id="@+id/edit_search_dashboard"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:hint="חפש מוצר בהיסטוריה..."
+        android:paddingStart="12dp"
+        android:background="@android:drawable/editbox_background"
+        android:textColor="@android:color/black"
+        android:layout_marginBottom="12dp"
+        android:drawableStart="@android:drawable/ic_menu_search"
+        android:drawablePadding="8dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="12dp">
+
+        <Button
+            android:id="@+id/button_date_picker"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="בחר טווח תאריכים"
+            android:textAllCaps="false" />
+
+        <ImageButton
+            android:id="@+id/button_clear_filter"
+            android:layout_width="50dp"
+            android:layout_height="match_parent"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            android:background="?attr/selectableItemBackground"
+            app:tint="@android:color/darker_gray" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/text_filter_status"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="מציג את כל הפעילויות"
+        android:textSize="14sp"
+        android:layout_marginBottom="8dp"
+        android:textColor="#666666"
+        android:textStyle="italic" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recycler_transactions"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:scrollbars="vertical" />
+
+</LinearLayout>
