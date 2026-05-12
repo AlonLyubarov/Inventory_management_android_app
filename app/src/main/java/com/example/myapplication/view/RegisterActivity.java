@@ -37,13 +37,13 @@ public class RegisterActivity extends AppCompatActivity {
 
             // Basic validation for empty fields
             if (email.isEmpty() || password.isEmpty()) {
-                Toast.makeText(this, "Please fill all fields", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "נא למלא את כל השדות", Toast.LENGTH_SHORT).show();
                 return;
             }
 
-            // Firebase requires at least 6 characters for the password
-            if (password.length() < 6) {
-                Toast.makeText(this, "Password must be at least 6 characters", Toast.LENGTH_SHORT).show();
+            // Strong password validation
+            if (!isValidPassword(password)) {
+                Toast.makeText(this, "הסיסמה חייבת להיות באורך 8 תווים לפחות, ולכלול אות גדולה, אות קטנה, מספר ותו מיוחד", Toast.LENGTH_LONG).show();
                 return;
             }
 
@@ -64,7 +64,7 @@ public class RegisterActivity extends AppCompatActivity {
                             }).start();
 
                             // Show success message and navigate to MainActivity
-                            Toast.makeText(RegisterActivity.this, "Registration successful!", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(RegisterActivity.this, "ההרשמה הצליחה!", Toast.LENGTH_SHORT).show();
                             startActivity(new Intent(RegisterActivity.this, MainActivity.class));
 
                             // Close RegisterActivity so the user cannot navigate back to it
@@ -75,5 +75,10 @@ public class RegisterActivity extends AppCompatActivity {
                         }
                     });
         });
+    }
+
+    private boolean isValidPassword(String password) {
+        String passwordPattern = "^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+=!])(?=\\S+$).{8,}$";
+        return password.matches(passwordPattern);
     }
 }

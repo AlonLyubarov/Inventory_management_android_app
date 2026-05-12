@@ -9,7 +9,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Create Account"
+        android:text="יצירת חשבון"
         android:textSize="28sp"
         android:textStyle="bold"
         android:layout_marginBottom="32dp"
@@ -19,7 +19,7 @@
         android:id="@+id/edit_text_email_reg"
         android:layout_width="match_parent"
         android:layout_height="50dp"
-        android:hint="Email"
+        android:hint="אימייל"
         android:inputType="textEmailAddress"
         android:layout_marginBottom="16dp"
         android:padding="12dp"
@@ -31,7 +31,7 @@
         android:id="@+id/edit_text_password_reg"
         android:layout_width="match_parent"
         android:layout_height="50dp"
-        android:hint="Password (min 6 characters)"
+        android:hint="סיסמה (8+ תווים, אותיות ומספרים)"
         android:inputType="textPassword"
         android:layout_marginBottom="24dp"
         android:padding="12dp"
@@ -43,6 +43,6 @@
         android:id="@+id/button_register"
         android:layout_width="match_parent"
         android:layout_height="55dp"
-        android:text="Register" />
+        android:text="הרשמה" />
 
 </LinearLayout>

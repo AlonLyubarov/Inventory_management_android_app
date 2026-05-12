@@ -1,5 +1,7 @@
 package com.example.myapplication.view;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.SearchView;
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -9,7 +11,6 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.ViewModelProvider;
-import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -23,7 +24,6 @@ import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
-    // Global variables (Members) accessible by all methods in this class
     private ItemViewModel itemViewModel;
     private ItemAdapter adapter;
     private FirebaseAuth mAuth;
@@ -37,6 +37,7 @@ public class MainActivity extends AppCompatActivity {
         mAuth = FirebaseAuth.getInstance();
         FirebaseUser currentUser = mAuth.getCurrentUser();
 
+        // Redirect to Login if not authenticated
         if (currentUser == null) {
             Toast.makeText(this, "Please log in first", Toast.LENGTH_SHORT).show();
             finish();
@@ -51,45 +52,40 @@ public class MainActivity extends AppCompatActivity {
         EditText editTextPrice = findViewById(R.id.edit_text_price);
         Button buttonAdd = findViewById(R.id.button_add);
 
-        // Initialize RecyclerView
+        // Setup RecyclerView
         RecyclerView recyclerView = findViewById(R.id.recycler_view);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         recyclerView.setHasFixedSize(true);
 
-        // Initialize the global adapter variable
         adapter = new ItemAdapter();
         recyclerView.setAdapter(adapter);
 
-        // Initialize the global ViewModel variable
+        // Initialize ViewModel
         itemViewModel = new ViewModelProvider(this).get(ItemViewModel.class);
 
-        // Observe all items for the current user
+        // Handle quantity changes and deletion from the adapter
+        adapter.setOnItemClickListener(new ItemAdapter.OnItemClickListener() {
+            @Override
+            public void onQuantityChange(Item item, int newQuantity) {
+                int oldQuantity = item.getQuantity();
+                item.setQuantity(newQuantity);
+                itemViewModel.update(item, oldQuantity);
+            }
+
+            @Override
+            public void onDeleteClick(Item item) {
+                showDeleteConfirmationDialog(item);
+            }
+        });
+
+        // Observe items from the database
         itemViewModel.getAllItems(currentUserId).observe(this, items -> {
             if (items != null) {
                 adapter.setItems(items);
             }
         });
 
-        // Swipe to Delete functionality
-        new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(0,
-                ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT) {
-            @Override
-            public boolean onMove(@NonNull RecyclerView recyclerView,
-                                  @NonNull RecyclerView.ViewHolder viewHolder,
-                                  @NonNull RecyclerView.ViewHolder target) {
-                return false;
-            }
-
-            @Override
-            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
-                int position = viewHolder.getAdapterPosition();
-                Item itemToDelete = adapter.getItemAt(position);
-                itemViewModel.delete(itemToDelete);
-                Toast.makeText(MainActivity.this, "Item deleted", Toast.LENGTH_SHORT).show();
-            }
-        }).attachToRecyclerView(recyclerView);
-
-        // Logic for adding a new item
+        // Add item button logic
         buttonAdd.setOnClickListener(v -> {
             String name = editTextName.getText().toString();
             String quantityStr = editTextQuantity.getText().toString();
@@ -106,30 +102,42 @@ public class MainActivity extends AppCompatActivity {
             Item newItem = new Item(name, price, quantity, currentUserId);
             itemViewModel.insert(newItem);
 
+            // Clear inputs after success
             editTextName.setText("");
             editTextQuantity.setText("");
             editTextPrice.setText("");
-            Toast.makeText(this, "Item saved", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Item saved successfully", Toast.LENGTH_SHORT).show();
         });
+    }
+
+    /**
+     * Shows a confirmation dialog before deleting an item.
+     */
+    private void showDeleteConfirmationDialog(Item item) {
+        new AlertDialog.Builder(this)
+                .setTitle("Delete Item")
+                .setMessage("Are you sure you want to delete " + item.getName() + "?")
+                .setPositiveButton("Delete", (dialog, which) -> {
+                    itemViewModel.delete(item);
+                    Toast.makeText(MainActivity.this, "Item deleted", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     @Override
     protected void onStart() {
         super.onStart();
-        // Check if user is signed in (non-null) and update UI accordingly.
         if (mAuth.getCurrentUser() == null) {
             Toast.makeText(this, "No user logged in", Toast.LENGTH_SHORT).show();
-            // You can also redirect to Login screen here
         }
     }
 
     /**
-     * Filters the database based on the search query.
+     * Executes search query against the database.
      */
     private void searchDatabase(String query) {
         String searchQuery = "%" + query + "%";
-
-        // Calling the method through the initialized itemViewModel instance
         itemViewModel.searchDatabase(searchQuery).observe(this, items -> {
             if (items != null) {
                 adapter.setItems(items);
@@ -139,27 +147,30 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.main_menu, menu);
-
         MenuItem searchItem = menu.findItem(R.id.action_search);
         androidx.appcompat.widget.SearchView searchView = (androidx.appcompat.widget.SearchView) searchItem.getActionView();
 
-        // Listener for search input changes
         searchView.setOnQueryTextListener(new androidx.appcompat.widget.SearchView.OnQueryTextListener() {
             @Override
-            public boolean onQueryTextSubmit(String query) {
-                return false;
-            }
+            public boolean onQueryTextSubmit(String query) { return false; }
 
             @Override
             public boolean onQueryTextChange(String newText) {
-                // Execute search logic on every keystroke
                 searchDatabase(newText);
                 return true;
             }
         });
-
         return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        if (item.getItemId() == R.id.action_dashboard) {
+            Intent intent = new Intent(MainActivity.this, DashboardActivity.class);
+            startActivity(intent);
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 }
