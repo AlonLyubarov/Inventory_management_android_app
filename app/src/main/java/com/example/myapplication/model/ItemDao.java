@@ -30,4 +30,10 @@ public interface ItemDao {
 
     @Query("SELECT * FROM items_table WHERE name LIKE :searchQuery")
     LiveData<List<Item>> searchDatabase(String searchQuery);
-      }
+
+    @Query("SELECT COUNT(*) FROM items_table WHERE ownerId = :userId")
+    LiveData<Integer> getTotalItemsCount(String userId);
+
+    @Query("SELECT SUM(price * quantity) FROM items_table WHERE ownerId = :userId")
+    LiveData<Double> getTotalInventoryValue(String userId);
+}

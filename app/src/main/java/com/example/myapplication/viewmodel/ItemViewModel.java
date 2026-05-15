@@ -54,6 +54,14 @@ public class ItemViewModel extends AndroidViewModel {
         return mRepository.getTransactionsByDateRange(userId, start, end);
     }
 
+    public LiveData<Integer> getTotalItemsCount(String userId) {
+        return mRepository.getTotalItemsCount(userId);
+    }
+
+    public LiveData<Double> getTotalInventoryValue(String userId) {
+        return mRepository.getTotalInventoryValue(userId);
+    }
+
     /**
      * Cleans up transactions older than the specified number of days.
      * Uses java.time.Instant for safe and readable time calculations.

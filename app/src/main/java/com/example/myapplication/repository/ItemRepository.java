@@ -94,6 +94,14 @@ public class ItemRepository {
         return mTransactionDao.searchTransactions(userId, "%%");
     }
 
+    public LiveData<Integer> getTotalItemsCount(String userId) {
+        return mItemDao.getTotalItemsCount(userId);
+    }
+
+    public LiveData<Double> getTotalInventoryValue(String userId) {
+        return mItemDao.getTotalInventoryValue(userId);
+    }
+
     /**
      * Searches transactions for a specific user.
      */

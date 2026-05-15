@@ -31,7 +31,7 @@ public class DashboardActivity extends AppCompatActivity {
     private TextView textTotalItems, textTotalValue, textFilterStatus;
     private TransactionAdapter adapter;
     private String userId;
-    private SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yy", Locale.getDefault());
+    private final SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yy", Locale.getDefault());
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,11 +60,18 @@ public class DashboardActivity extends AppCompatActivity {
         
         userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
 
-        // 1. Initial Load and Summary
+        // 1. Load data
         loadAllTransactions();
         
-        itemViewModel.getAllItems(userId).observe(this, items -> {
-            if (items != null) updateSummary(items);
+        // Performance Fix: Using background queries for summary instead of UI thread calculations
+        itemViewModel.getTotalItemsCount(userId).observe(this, count -> {
+            int finalCount = (count != null) ? count : 0;
+            textTotalItems.setText(String.format(Locale.getDefault(), "סהכ פריטים: %d", finalCount));
+        });
+
+        itemViewModel.getTotalInventoryValue(userId).observe(this, value -> {
+            double finalValue = (value != null) ? value : 0.0;
+            textTotalValue.setText(String.format(Locale.getDefault(), "שווי כולל: ₪%.2f", finalValue));
         });
 
         // 2. Search Logic
@@ -105,7 +112,6 @@ public class DashboardActivity extends AppCompatActivity {
                 itemViewModel.getTransactionsByDateRange(userId, start, queryEnd).observe(this, transactions -> {
                     if (transactions != null) {
                         adapter.setTransactions(transactions);
-                        // Use rawEnd for display to avoid "extra day" due to timezone/calculation
                         String status = "מציג מ-" + dateFormat.format(new Date(start)) + " עד " + dateFormat.format(new Date(rawEnd));
                         textFilterStatus.setText(status);
                     }
@@ -127,15 +133,5 @@ public class DashboardActivity extends AppCompatActivity {
                 textFilterStatus.setText("מציג את כל הפעילויות");
             }
         });
-    }
-
-    private void updateSummary(List<Item> items) {
-        int count = items.size();
-        double totalValue = 0;
-        for (Item item : items) {
-            totalValue += (item.getPrice() * item.getQuantity());
-        }
-        textTotalItems.setText(String.format(Locale.getDefault(), "סהכ פריטים: %d", count));
-        textTotalValue.setText(String.format(Locale.getDefault(), "שווי כולל: ₪%.2f", totalValue));
     }
 }
