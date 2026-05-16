@@ -1,42 +1,87 @@
-Inventory Management App 📦
-A robust Android application for managing warehouse or personal inventory, featuring real-time database synchronization and a clean MVVM architecture.
+# 📦 Your Inventory - Professional Android Management App
 
-🚀 Features
-User Authentication: Secure Login and Registration powered by Firebase Auth.
+[![Android](https://img.shields.io/badge/Platform-Android-green.svg)](https://developer.android.com/)
+[![Java](https://img.shields.io/badge/Language-Java-orange.svg)](https://www.oracle.com/java/)
+[![Room](https://img.shields.io/badge/Database-Room-blue.svg)](https://developer.android.com/training/data-storage/room)
+[![Firebase](https://img.shields.io/badge/Backend-Firebase-yellow.svg)](https://firebase.google.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Inventory Management: Add, view, and delete items with specific attributes (Name, Quantity, Price).
+A robust and modern Android application designed for high-performance inventory and warehouse management. This app follows an **offline-first** philosophy, using local persistence with Room DB and secure cloud synchronization for authentication via Firebase.
 
-Real-time Search: Dynamic filtering of items using a SearchView in the Toolbar.
+---
 
-Local Persistence: Data is stored locally using Room Database, ensuring offline availability.
+## 🏛 Architecture: MVVM
 
-Modern UI: Built with RecyclerView, CardView, and interactive "Swipe-to-Delete" functionality.
+The project is built using the **MVVM (Model-View-ViewModel)** architectural pattern, ensuring a clean separation of concerns and high maintainability.
 
-🛠 Tech Stack
-Language: Java
+- **Model**: Data layer representing Room entities (`Item`, `User`, `Transaction`).
+- **View**: UI layer (`MainActivity`, `DashboardActivity`) observing `LiveData` for real-time updates.
+- **ViewModel**: Acts as a bridge, maintaining state and handling logic.
+- **Repository**: Single source of truth coordinating between different DAOs and background threads.
 
-Architecture: MVVM (Model-View-ViewModel)
+---
 
-Database: Room (SQLite)
+## 🚀 Key Features
 
-Backend: Firebase Authentication
+### 📊 Advanced Dashboard & Analytics
+- **Live Inventory Summary**: Real-time calculation of total stock and financial value (optimized with SQL `SUM` and `COUNT`).
+- **Activity Log**: Comprehensive tracking of every `ADD`, `DELETE`, and `UPDATE` action.
+- **Smart Filtering**:
+    - 🔍 **Free Text Search**: Instantly find specific items within the history.
+    - 📅 **Date Range Picker**: Filter logs using a modern calendar interface.
+- **Maintenance**: Auto-cleanup of logs older than 30 days using `java.time.Instant` for precision.
 
-UI Components: LiveData, ViewModel, ConstraintLayout, Material Design.
+### 📦 Modern Inventory Control
+- **Intuitive UI**: Material 3 design with `CardView` layouts and smooth animations.
+- **One-Tap Actions**: Quick `+/-` buttons for instant quantity adjustments.
+- **Safety First**: Deletion guarded by confirmation dialogs to prevent data loss.
 
-📂 Project Structure
-model/: Contains the Item entity and Room Database configuration.
+### 🔐 Security & Identity
+- **Firebase Auth**: Secure cloud-based authentication.
+- **Strong Validation**: Strict password requirements for user safety.
+- **User Isolation**: Secure data partitioning ensures users only access their own private inventory.
 
-view/: Activities (MainActivity, LoginActivity, RegisterActivity) and the ItemAdapter.
+---
 
-viewmodel/: ItemViewModel for managing UI-related data.
+## 🛠 Tech Stack
 
-repository/: Handles data operations between the ViewModel and the Room DAO.
+| Category | Technology |
+| --- | --- |
+| **Language** | Java 11 |
+| **Database** | Room Persistence Library (SQLite) |
+| **Backend** | Firebase Auth & Analytics |
+| **UI Framework** | Material Components, RecyclerView |
+| **Reactive UI** | LiveData & ViewModel (Jetpack) |
+| **Concurrency** | ExecutorService |
 
-⚙️ Setup
-Clone the repository.
+---
 
-Connect the project to your Firebase Console.
+## 📂 Project Structure
 
-Download the google-services.json and place it in the app/ folder.
+```text
+com.example.myapplication/
+├── model/           # Data Entities & Room DAOs
+├── repository/      # Data handling & logic
+├── view/            # Activities, Adapters & UI
+└── viewmodel/       # UI State management
+```
 
-Build and Run on an Android Emulator or physical device.
+---
+
+## ⚙️ Setup Instructions
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/AlonLyubarov/Inventory_management_android_app.git
+   ```
+2. **Firebase Configuration**:
+   - Register your app in the [Firebase Console](https://console.firebase.google.com/).
+   - Place your `google-services.json` in the `app/` folder.
+3. **Build & Run**:
+   - Open in Android Studio Giraffe or newer.
+   - Minimum SDK: 26.
+
+---
+
+## 📄 License
+Licensed under the **MIT License**. Feel free to use and adapt for your needs!
