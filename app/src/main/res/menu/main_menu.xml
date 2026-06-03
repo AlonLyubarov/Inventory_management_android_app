@@ -3,6 +3,25 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
+        android:id="@+id/action_manage_users"
+        android:icon="@android:drawable/ic_menu_myplaces"
+        android:title="Manage Team"
+        app:showAsAction="ifRoom"
+        android:visible="false" />
+
+    <item
+        android:id="@+id/action_reports"
+        android:icon="@android:drawable/ic_menu_save"
+        android:title="Reports"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/action_catalog"
+        android:icon="@android:drawable/ic_menu_agenda"
+        android:title="Catalog"
+        app:showAsAction="ifRoom" />
+
+    <item
         android:id="@+id/action_dashboard"
         android:icon="@android:drawable/ic_menu_sort_by_size"
         android:title="Dashboard"
@@ -14,5 +33,17 @@
         android:title="Search"
         app:actionViewClass="androidx.appcompat.widget.SearchView"
         app:showAsAction="always|collapseActionView" />
+
+    <item
+        android:id="@+id/action_logout"
+        android:icon="@android:drawable/ic_lock_power_off"
+        android:title="התנתקות"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_reset"
+        android:icon="@android:drawable/ic_menu_delete"
+        android:title="איפוס משתמש (Deep Reset)"
+        app:showAsAction="never" />
 
 </menu>

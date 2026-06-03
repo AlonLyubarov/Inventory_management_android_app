@@ -1,5 +1,6 @@
 package com.example.myapplication.view;
 
+import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -7,6 +8,7 @@ import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.myapplication.R;
@@ -14,6 +16,7 @@ import com.example.myapplication.model.Item;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemHolder> {
 
@@ -40,15 +43,36 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemHolder> {
     @Override
     public void onBindViewHolder(@NonNull ItemHolder holder, int position) {
         Item currentItem = items.get(position);
-        String name = currentItem.getName();
-        int quantity = currentItem.getQuantity();
-        double price = currentItem.getPrice();
-        double total = quantity * price;
+        
+        holder.textViewName.setText(currentItem.getName());
+        
+        if (currentItem.getSku() != null && !currentItem.getSku().isEmpty()) {
+            holder.textViewSku.setVisibility(View.VISIBLE);
+            holder.textViewSku.setText("מק''ט: " + currentItem.getSku());
+        } else {
+            holder.textViewSku.setVisibility(View.GONE);
+        }
 
-        holder.textViewName.setText(name);
+        int quantity = currentItem.getQuantity();
+        int threshold = currentItem.getLowStockThreshold();
+        
         holder.textViewQuantity.setText(String.valueOf(quantity));
-        holder.textViewPrice.setText("₪" + String.format("%.2f", price));
-        holder.textViewTotalPrice.setText("סה\"כ שווי: ₪" + String.format("%.2f", total));
+
+        // Low Stock Alert Logic
+        if (threshold > 0 && quantity < threshold) {
+            holder.itemView.findViewById(R.id.item_card_container).setBackgroundColor(0xFFFFEBEE); 
+            holder.textViewQuantity.setTextColor(0xFFD32F2F);
+            holder.textViewName.setText("⚠️ " + currentItem.getName() + " (מלאי נמוך!)");
+        } else {
+            holder.itemView.findViewById(R.id.item_card_container).setBackgroundColor(Color.WHITE);
+            holder.textViewQuantity.setTextColor(0xFF000000);
+            holder.textViewName.setText(currentItem.getName());
+        }
+
+        holder.textViewPrice.setText(String.format(Locale.getDefault(), "₪%.2f", currentItem.getPrice()));
+        
+        double total = quantity * currentItem.getPrice();
+        holder.textViewTotalPrice.setText(String.format(Locale.getDefault(), "סה\"כ שווי: ₪%.2f", total));
 
         holder.buttonPlus.setOnClickListener(v -> {
             if (listener != null) {
@@ -74,27 +98,61 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemHolder> {
         return items.size();
     }
 
-    public void setItems(List<Item> items) {
-        this.items = items;
-        notifyDataSetChanged();
+    /**
+     * Professional way to update the list using DiffUtil.
+     * This prevents items from jumping around and animates changes smoothly.
+     */
+    public void setItems(List<Item> newItems) {
+        DiffUtil.DiffResult diffResult = DiffUtil.calculateDiff(new ItemDiffCallback(this.items, newItems));
+        this.items.clear();
+        this.items.addAll(newItems);
+        diffResult.dispatchUpdatesTo(this);
     }
 
-    public Item getItemAt(int position) {
-        return items.get(position);
+    /**
+     * Callback class for DiffUtil to compare old and new list items.
+     */
+    private static class ItemDiffCallback extends DiffUtil.Callback {
+        private final List<Item> oldList;
+        private final List<Item> newList;
+
+        public ItemDiffCallback(List<Item> oldList, List<Item> newList) {
+            this.oldList = oldList;
+            this.newList = newList;
+        }
+
+        @Override
+        public int getOldListSize() { return oldList.size(); }
+
+        @Override
+        public int getNewListSize() { return newList.size(); }
+
+        @Override
+        public boolean areItemsTheSame(int oldPos, int newPos) {
+            // Compare items by their database IDs or firestore IDs
+            return oldList.get(oldPos).getId() == newList.get(newPos).getId();
+        }
+
+        @Override
+        public boolean areContentsTheSame(int oldPos, int newPos) {
+            Item oldItem = oldList.get(oldPos);
+            Item newItem = newList.get(newPos);
+            // Check if any visual property has changed
+            return oldItem.getQuantity() == newItem.getQuantity() &&
+                   oldItem.getPrice() == newItem.getPrice() &&
+                   oldItem.getName().equals(newItem.getName());
+        }
     }
 
     class ItemHolder extends RecyclerView.ViewHolder {
-        private TextView textViewName;
-        private TextView textViewQuantity;
-        private TextView textViewPrice;
-        private TextView textViewTotalPrice;
-        private Button buttonPlus;
-        private Button buttonMinus;
-        private ImageButton buttonDelete;
+        private final TextView textViewName, textViewSku, textViewQuantity, textViewPrice, textViewTotalPrice;
+        private final Button buttonPlus, buttonMinus;
+        private final ImageButton buttonDelete;
 
         public ItemHolder(@NonNull View itemView) {
             super(itemView);
             textViewName = itemView.findViewById(R.id.text_view_name);
+            textViewSku = itemView.findViewById(R.id.text_view_sku);
             textViewQuantity = itemView.findViewById(R.id.text_view_quantity);
             textViewPrice = itemView.findViewById(R.id.text_view_price);
             textViewTotalPrice = itemView.findViewById(R.id.text_view_total_price);

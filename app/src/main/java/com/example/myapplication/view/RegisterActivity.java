@@ -2,8 +2,10 @@ package com.example.myapplication.view;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -11,70 +13,94 @@ import com.example.myapplication.R;
 import com.example.myapplication.model.User;
 import com.example.myapplication.model.AppDatabase;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.FirebaseFirestore;
 
 public class RegisterActivity extends AppCompatActivity {
 
-    private EditText editTextEmail, editTextPassword;
+    private EditText editTextEmail, editTextPassword, editTextDisplayName;
+    private Spinner spinnerRoles;
     private FirebaseAuth mAuth;
+    private FirebaseFirestore mFirestore;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_register);
 
-        // Initialize Firebase Auth instance
         mAuth = FirebaseAuth.getInstance();
+        mFirestore = FirebaseFirestore.getInstance();
 
-        // Initialize UI components
+        editTextDisplayName = findViewById(R.id.edit_text_display_name);
         editTextEmail = findViewById(R.id.edit_text_email_reg);
         editTextPassword = findViewById(R.id.edit_text_password_reg);
+        spinnerRoles = findViewById(R.id.spinner_roles);
         Button buttonRegister = findViewById(R.id.button_register);
 
-        // Set click listener for the register button
+        String[] roles = {"עובד מחסן", "ראש משמרת", "מנהל מחסן"};
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, roles);
+        spinnerRoles.setAdapter(adapter);
+
         buttonRegister.setOnClickListener(v -> {
-            String email = editTextEmail.getText().toString().trim();
+            String email = editTextEmail.getText().toString().trim().toLowerCase();
             String password = editTextPassword.getText().toString().trim();
+            String name = editTextDisplayName.getText().toString().trim();
+            String selectedRoleLabel = spinnerRoles.getSelectedItem().toString();
+            String role = mapLabelToRole(selectedRoleLabel);
 
-            // Basic validation for empty fields
-            if (email.isEmpty() || password.isEmpty()) {
-                Toast.makeText(this, "נא למלא את כל השדות", Toast.LENGTH_SHORT).show();
+            if (email.isEmpty() || name.isEmpty()) {
+                Toast.makeText(this, "נא למלא שם ואימייל", Toast.LENGTH_SHORT).show();
                 return;
             }
 
-            // Strong password validation
-            if (!isValidPassword(password)) {
-                Toast.makeText(this, "הסיסמה חייבת להיות באורך 8 תווים לפחות, ולכלול אות גדולה, אות קטנה, מספר ותו מיוחד", Toast.LENGTH_LONG).show();
+            // SMART REGISTER: If user is already logged in (auth exists), just save to Firestore
+            if (mAuth.getCurrentUser() != null && mAuth.getCurrentUser().getEmail().equalsIgnoreCase(email)) {
+                saveUserToFirestore(mAuth.getUid(), email, name, role);
                 return;
             }
 
-            // Step 1: Create user in Firebase Authentication
+            if (password.isEmpty() || !isValidPassword(password)) {
+                Toast.makeText(this, "סיסמה לא תקינה", Toast.LENGTH_LONG).show();
+                return;
+            }
+
             mAuth.createUserWithEmailAndPassword(email, password)
                     .addOnCompleteListener(this, task -> {
                         if (task.isSuccessful()) {
-                            // Step 2: Get the unique User ID (UID) and Email from the newly created Firebase user
-                            String uid = mAuth.getCurrentUser().getUid();
-                            String userEmail = mAuth.getCurrentUser().getEmail();
-
-                            // Step 3: Create a User entity object for Room Database
-                            User newUser = new User(uid, userEmail);
-
-                            // Step 4: Save the user to the local Room Database on a background thread
-                            new Thread(() -> {
-                                AppDatabase.getDatabase(getApplicationContext()).userDao().insert(newUser);
-                            }).start();
-
-                            // Show success message and navigate to MainActivity
-                            Toast.makeText(RegisterActivity.this, "ההרשמה הצליחה!", Toast.LENGTH_SHORT).show();
-                            startActivity(new Intent(RegisterActivity.this, MainActivity.class));
-
-                            // Close RegisterActivity so the user cannot navigate back to it
-                            finish();
+                            saveUserToFirestore(mAuth.getCurrentUser().getUid(), email, name, role);
                         } else {
-                            // If registration fails, display the error message from Firebase
-                            Toast.makeText(RegisterActivity.this, "Error: " + task.getException().getMessage(), Toast.LENGTH_LONG).show();
+                            if (task.getException() instanceof com.google.firebase.auth.FirebaseAuthUserCollisionException) {
+                                // User exists in Auth, try to sign in then save
+                                mAuth.signInWithEmailAndPassword(email, password)
+                                    .addOnSuccessListener(res -> saveUserToFirestore(res.getUser().getUid(), email, name, role))
+                                    .addOnFailureListener(e -> Toast.makeText(this, "סיסמה שגויה למשתמש קיים", Toast.LENGTH_SHORT).show());
+                            } else {
+                                Toast.makeText(this, "שגיאה ברישום", Toast.LENGTH_SHORT).show();
+                            }
                         }
                     });
         });
+    }
+
+    private void saveUserToFirestore(String uid, String email, String name, String role) {
+        String employerId = uid;
+        if (!"MANAGER".equals(role)) {
+            employerId = "PENDING";
+        }
+        User newUser = new User(uid, email, name, role, employerId);
+        mFirestore.collection("users").document(uid).set(newUser)
+                .addOnSuccessListener(aVoid -> {
+                    Toast.makeText(this, "פרופיל עודכן בהצלחה", Toast.LENGTH_SHORT).show();
+                    startActivity(new Intent(this, MainActivity.class));
+                    finish();
+                });
+    }
+
+    private String mapLabelToRole(String label) {
+        switch (label) {
+            case "ראש משמרת": return "SHIFT_LEADER";
+            case "מנהל מחסן": return "MANAGER";
+            default: return "WORKER";
+        }
     }
 
     private boolean isValidPassword(String password) {

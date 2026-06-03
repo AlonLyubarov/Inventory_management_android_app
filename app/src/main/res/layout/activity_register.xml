@@ -1,48 +1,113 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="24dp"
-    android:gravity="center">
+    android:background="#F5F5F5">
 
-    <TextView
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="יצירת חשבון"
-        android:textSize="28sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="32dp"
-        android:textColor="@android:color/black" />
+        android:orientation="vertical"
+        android:padding="24dp">
 
-    <EditText
-        android:id="@+id/edit_text_email_reg"
-        android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:hint="אימייל"
-        android:inputType="textEmailAddress"
-        android:layout_marginBottom="16dp"
-        android:padding="12dp"
-        android:background="@android:drawable/editbox_background"
-        android:textColor="@android:color/black"
-        android:textColorHint="@android:color/darker_gray" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="רישום עובד חדש"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:layout_gravity="center"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="32dp"
+            android:textColor="@android:color/black" />
 
-    <EditText
-        android:id="@+id/edit_text_password_reg"
-        android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:hint="סיסמה (8+ תווים, אותיות ומספרים)"
-        android:inputType="textPassword"
-        android:layout_marginBottom="24dp"
-        android:padding="12dp"
-        android:background="@android:drawable/editbox_background"
-        android:textColor="@android:color/black"
-        android:textColorHint="@android:color/darker_gray" />
+        <!-- Field: Display Name -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="שם מלא של העובד:"
+            android:textStyle="bold"
+            android:textColor="#333333"
+            android:layout_marginBottom="4dp" />
 
-    <Button
-        android:id="@+id/button_register"
-        android:layout_width="match_parent"
-        android:layout_height="55dp"
-        android:text="הרשמה" />
+        <EditText
+            android:id="@+id/edit_text_display_name"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:hint="לדוגמה: ישראל ישראלי"
+            android:inputType="textPersonName"
+            android:layout_marginBottom="16dp"
+            android:padding="12dp"
+            android:background="@android:drawable/editbox_background"
+            android:textColor="@android:color/black"
+            android:textColorHint="#757575" />
 
-</LinearLayout>
+        <!-- Field: Email -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="כתובת אימייל (לצורך התחברות):"
+            android:textStyle="bold"
+            android:textColor="#333333"
+            android:layout_marginBottom="4dp" />
+
+        <EditText
+            android:id="@+id/edit_text_email_reg"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:hint="email@example.com"
+            android:inputType="textEmailAddress"
+            android:layout_marginBottom="16dp"
+            android:padding="12dp"
+            android:background="@android:drawable/editbox_background"
+            android:textColor="@android:color/black"
+            android:textColorHint="#757575" />
+
+        <!-- Field: Password -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="סיסמה (לפחות 8 תווים):"
+            android:textStyle="bold"
+            android:textColor="#333333"
+            android:layout_marginBottom="4dp" />
+
+        <EditText
+            android:id="@+id/edit_text_password_reg"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:hint="הזן סיסמה מאובטחת"
+            android:inputType="textPassword"
+            android:layout_marginBottom="16dp"
+            android:padding="12dp"
+            android:background="@android:drawable/editbox_background"
+            android:textColor="@android:color/black"
+            android:textColorHint="#757575" />
+
+        <!-- Field: Role -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="בחר את תפקיד העובד במחסן:"
+            android:textStyle="bold"
+            android:textColor="#333333"
+            android:layout_marginBottom="8dp" />
+
+        <Spinner
+            android:id="@+id/spinner_roles"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_marginBottom="32dp"
+            android:background="@android:drawable/btn_dropdown" />
+
+        <Button
+            android:id="@+id/button_register"
+            android:layout_width="match_parent"
+            android:layout_height="55dp"
+            android:text="צור חשבון"
+            android:textSize="18sp"
+            android:backgroundTint="#1976D2"
+            android:textColor="@android:color/white" />
+
+    </LinearLayout>
+</ScrollView>

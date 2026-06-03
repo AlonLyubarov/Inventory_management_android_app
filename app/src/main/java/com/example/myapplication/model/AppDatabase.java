@@ -8,12 +8,13 @@ import androidx.room.RoomDatabase;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-@Database(entities = {Item.class, User.class, Transaction.class}, version = 6, exportSchema = false)
+@Database(entities = {Item.class, User.class, Transaction.class, ProductTemplate.class}, version = 17, exportSchema = false)
 public abstract class AppDatabase extends RoomDatabase {
 
     public abstract ItemDao itemDao();
     public abstract UserDao userDao();
     public abstract TransactionDao transactionDao();
+    public abstract ProductTemplateDao productTemplateDao();
 
     private static volatile AppDatabase INSTANCE;
     private static final int NUMBER_OF_THREADS = 4;
@@ -33,5 +34,12 @@ public abstract class AppDatabase extends RoomDatabase {
             }
         }
         return INSTANCE;
+    }
+
+    public static void destroyInstance() {
+        if (INSTANCE != null) {
+            INSTANCE.close();
+            INSTANCE = null;
+        }
     }
 }

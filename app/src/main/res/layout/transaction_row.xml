@@ -36,12 +36,27 @@
             android:textColor="@android:color/darker_gray"/>
     </LinearLayout>
 
-    <TextView
-        android:id="@+id/text_transaction_details"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:textSize="13sp"
-        android:textColor="#555555" />
+        android:orientation="horizontal"
+        android:layout_marginTop="4dp">
+
+        <TextView
+            android:id="@+id/text_transaction_details"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textSize="13sp"
+            android:textColor="#555555" />
+
+        <TextView
+            android:id="@+id/text_transaction_performer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="11sp"
+            android:textColor="#1976D2"
+            android:textStyle="italic" />
+    </LinearLayout>
 
 </LinearLayout>

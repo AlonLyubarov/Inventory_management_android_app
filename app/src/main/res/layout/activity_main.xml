@@ -34,22 +34,61 @@
                     android:layout_marginBottom="12dp"
                     android:textColor="@android:color/black"/>
 
-                <EditText
-                    android:id="@+id/edit_text_name"
+                <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="50dp"
-                    android:hint="שם הפריט"
-                    android:inputType="text"
-                    android:background="@android:drawable/editbox_background"
-                    android:paddingStart="12dp"
-                    android:textColor="@android:color/black"
-                    android:textColorHint="@android:color/darker_gray" />
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <AutoCompleteTextView
+                        android:id="@+id/edit_text_name"
+                        android:layout_width="0dp"
+                        android:layout_height="50dp"
+                        android:layout_weight="1"
+                        android:hint="שם הפריט"
+                        android:inputType="text"
+                        android:background="@android:drawable/editbox_background"
+                        android:paddingStart="12dp"
+                        android:textColor="@android:color/black"
+                        android:textColorHint="@android:color/darker_gray"
+                        android:completionThreshold="1" />
+
+                    <View
+                        android:layout_width="8dp"
+                        android:layout_height="match_parent" />
+
+                    <EditText
+                        android:id="@+id/edit_text_sku"
+                        android:layout_width="120dp"
+                        android:layout_height="50dp"
+                        android:hint="מק''ט"
+                        android:inputType="text"
+                        android:background="@android:drawable/editbox_background"
+                        android:paddingStart="12dp"
+                        android:textColor="@android:color/black"
+                        android:textColorHint="@android:color/darker_gray" />
+                </LinearLayout>
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:layout_marginTop="8dp">
+
+                    <EditText
+                        android:id="@+id/edit_text_brand"
+                        android:layout_width="0dp"
+                        android:layout_height="50dp"
+                        android:layout_weight="2"
+                        android:hint="שם חברה/מותג"
+                        android:inputType="text"
+                        android:background="@android:drawable/editbox_background"
+                        android:paddingStart="12dp"
+                        android:textColor="@android:color/black"
+                        android:textColorHint="@android:color/darker_gray" />
+
+                    <View
+                        android:layout_width="8dp"
+                        android:layout_height="match_parent" />
 
                     <EditText
                         android:id="@+id/edit_text_quantity"
@@ -72,7 +111,7 @@
                         android:layout_width="0dp"
                         android:layout_height="50dp"
                         android:layout_weight="1"
-                        android:hint="מחיר (₪)"
+                        android:hint="₪"
                         android:inputType="numberDecimal"
                         android:background="@android:drawable/editbox_background"
                         android:paddingStart="12dp"
@@ -91,12 +130,20 @@
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/recycler_view"
+        <!-- SwipeRefreshLayout to wrap the RecyclerView -->
+        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+            android:id="@+id/swipe_refresh_layout"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:clipToPadding="false"
-            android:paddingBottom="16dp" />
+            android:layout_height="match_parent">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recycler_view"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingBottom="16dp" />
+
+        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
     </LinearLayout>
 

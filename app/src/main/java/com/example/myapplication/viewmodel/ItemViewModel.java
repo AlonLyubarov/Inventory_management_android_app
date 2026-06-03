@@ -6,7 +6,9 @@ import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 
 import com.example.myapplication.model.Item;
+import com.example.myapplication.model.ProductTemplate;
 import com.example.myapplication.model.Transaction;
+import com.example.myapplication.model.User;
 import com.example.myapplication.repository.ItemRepository;
 
 import java.time.Instant;
@@ -20,6 +22,14 @@ public class ItemViewModel extends AndroidViewModel {
     public ItemViewModel(@NonNull Application application) {
         super(application);
         mRepository = new ItemRepository(application);
+    }
+
+    public void syncFromCloud(String userId) {
+        mRepository.syncFromCloud(userId);
+    }
+
+    public LiveData<User> getUserProfile(String userId) {
+        return mRepository.getUserProfile(userId);
     }
 
     public LiveData<List<Item>> getAllItems(String userId) {
@@ -62,18 +72,29 @@ public class ItemViewModel extends AndroidViewModel {
         return mRepository.getTotalInventoryValue(userId);
     }
 
-    /**
-     * Cleans up transactions older than the specified number of days.
-     * Uses java.time.Instant for safe and readable time calculations.
-     */
-    public void cleanOldTransactions(long days) {
-        if (days <= 0) return;
+    public void cleanOldTransactions(long days, String userId) {
+        long threshold = Instant.now().minus(days, ChronoUnit.DAYS).toEpochMilli();
+        mRepository.cleanOldTransactions(threshold, userId);
+    }
 
-        // Calculate the threshold timestamp (current time minus X days)
-        long threshold = Instant.now()
-                .minus(days, ChronoUnit.DAYS)
-                .toEpochMilli();
+    // Product Template Methods
+    public LiveData<List<ProductTemplate>> getAllTemplates(String userId) {
+        return mRepository.getAllTemplates(userId);
+    }
 
-        mRepository.cleanOldTransactions(threshold);
+    public void upsertTemplate(ProductTemplate template) {
+        mRepository.upsertTemplate(template);
+    }
+
+    public void deleteTemplate(ProductTemplate template) {
+        mRepository.deleteTemplate(template);
+    }
+
+    public void logoutAndReset(Runnable onComplete) {
+        mRepository.logoutAndReset(onComplete);
+    }
+
+    public void logoutOnly(Runnable onComplete) {
+        mRepository.logoutOnly(onComplete);
     }
 }

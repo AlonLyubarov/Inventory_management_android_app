@@ -2,6 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -32,6 +35,28 @@
             android:name=".view.DashboardActivity"
             android:label="Dashboard"
             android:exported="false" />
+        <activity
+            android:name=".view.CatalogActivity"
+            android:label="Catalog Manager"
+            android:exported="false" />
+        <activity
+            android:name=".view.ReportsActivity"
+            android:label="Reports"
+            android:exported="false" />
+        <activity
+            android:name=".view.ManageUsersActivity"
+            android:label="Manage Team"
+            android:exported="false" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.example.myapplication.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

@@ -22,4 +22,7 @@ public interface TransactionDao {
 
     @Query("DELETE FROM transactions_table WHERE timestamp < :threshold")
     void deleteOldTransactions(long threshold);
+
+    @Query("DELETE FROM transactions_table")
+    void deleteAllTransactions();
 }

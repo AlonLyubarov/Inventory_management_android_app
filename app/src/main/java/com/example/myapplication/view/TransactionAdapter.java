@@ -32,6 +32,11 @@ public class TransactionAdapter extends RecyclerView.Adapter<TransactionAdapter.
         holder.type.setText(translateType(current.getType()));
         holder.itemName.setText(current.getItemName());
         
+        // Show Performer details
+        String performer = (current.getPerformedBy() != null ? current.getPerformedBy() : "מערכת") + 
+                " [" + translateRole(current.getPerformedByRole()) + "]";
+        holder.performer.setText(performer);
+
         String details = String.format(Locale.getDefault(), "כמות: %d | שווי: ₪%.2f", 
                 current.getQuantityChanged(), current.getAmountChanged());
         holder.details.setText(details);
@@ -64,6 +69,16 @@ public class TransactionAdapter extends RecyclerView.Adapter<TransactionAdapter.
         }
     }
 
+    private String translateRole(String role) {
+        if (role == null) return "לא ידוע";
+        switch (role) {
+            case "MANAGER": return "מנהל";
+            case "SHIFT_LEADER": return "ר.משמרת";
+            case "WORKER": return "עובד";
+            default: return role;
+        }
+    }
+
     @Override
     public int getItemCount() {
         return transactions.size();
@@ -75,10 +90,7 @@ public class TransactionAdapter extends RecyclerView.Adapter<TransactionAdapter.
     }
 
     static class TransactionHolder extends RecyclerView.ViewHolder {
-        private final TextView type;
-        private final TextView itemName;
-        private final TextView details;
-        private final TextView time;
+        private final TextView type, itemName, details, time, performer;
 
         public TransactionHolder(@NonNull View itemView) {
             super(itemView);
@@ -86,6 +98,7 @@ public class TransactionAdapter extends RecyclerView.Adapter<TransactionAdapter.
             itemName = itemView.findViewById(R.id.text_transaction_item);
             details = itemView.findViewById(R.id.text_transaction_details);
             time = itemView.findViewById(R.id.text_transaction_time);
+            performer = itemView.findViewById(R.id.text_transaction_performer);
         }
     }
 }

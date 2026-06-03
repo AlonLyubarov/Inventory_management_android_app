@@ -3,7 +3,6 @@ package com.example.myapplication.view;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
-import android.util.Log;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
@@ -15,14 +14,13 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.myapplication.R;
-import com.example.myapplication.model.Item;
+import com.example.myapplication.model.User;
 import com.example.myapplication.viewmodel.ItemViewModel;
 import com.google.android.material.datepicker.MaterialDatePicker;
 import com.google.firebase.auth.FirebaseAuth;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.List;
 import java.util.Locale;
 
 public class DashboardActivity extends AppCompatActivity {
@@ -30,7 +28,7 @@ public class DashboardActivity extends AppCompatActivity {
     private ItemViewModel itemViewModel;
     private TextView textTotalItems, textTotalValue, textFilterStatus;
     private TransactionAdapter adapter;
-    private String userId;
+    private String warehouseId;
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yy", Locale.getDefault());
 
     @Override
@@ -58,23 +56,41 @@ public class DashboardActivity extends AppCompatActivity {
             return;
         }
         
-        userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
 
-        // 1. Load data
+        // Load Warehouse context from Profile
+        itemViewModel.getUserProfile(userId).observe(this, user -> {
+            if (user != null) {
+                this.warehouseId = user.getEmployerId();
+                initializeDashboard();
+            }
+        });
+
+        // 4. Clear Filter Logic
+        buttonClear.setOnClickListener(v -> {
+            editSearch.setText("");
+            if (warehouseId != null) loadAllTransactions();
+        });
+    }
+
+    private void initializeDashboard() {
+        if (warehouseId == null) return;
+
+        // 1. Initial Load
         loadAllTransactions();
         
-        // Performance Fix: Using background queries for summary instead of UI thread calculations
-        itemViewModel.getTotalItemsCount(userId).observe(this, count -> {
+        itemViewModel.getTotalItemsCount(warehouseId).observe(this, count -> {
             int finalCount = (count != null) ? count : 0;
             textTotalItems.setText(String.format(Locale.getDefault(), "סהכ פריטים: %d", finalCount));
         });
 
-        itemViewModel.getTotalInventoryValue(userId).observe(this, value -> {
+        itemViewModel.getTotalInventoryValue(warehouseId).observe(this, value -> {
             double finalValue = (value != null) ? value : 0.0;
             textTotalValue.setText(String.format(Locale.getDefault(), "שווי כולל: ₪%.2f", finalValue));
         });
 
-        // 2. Search Logic
+        // 2. Search Logic (Updated to use warehouseId)
+        EditText editSearch = findViewById(R.id.edit_search_dashboard);
         editSearch.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -84,7 +100,7 @@ public class DashboardActivity extends AppCompatActivity {
                 if (query.isEmpty()) {
                     loadAllTransactions();
                 } else {
-                    itemViewModel.searchTransactions(userId, query).observe(DashboardActivity.this, transactions -> {
+                    itemViewModel.searchTransactions(warehouseId, query).observe(DashboardActivity.this, transactions -> {
                         if (transactions != null) {
                             adapter.setTransactions(transactions);
                             textFilterStatus.setText("תוצאות חיפוש עבור: " + query);
@@ -96,7 +112,8 @@ public class DashboardActivity extends AppCompatActivity {
             public void afterTextChanged(Editable s) {}
         });
 
-        // 3. Date Range Picker Logic
+        // 3. Date Range Picker Logic (Updated to use warehouseId)
+        Button buttonDatePicker = findViewById(R.id.button_date_picker);
         buttonDatePicker.setOnClickListener(v -> {
             MaterialDatePicker<Pair<Long, Long>> picker = MaterialDatePicker.Builder.dateRangePicker()
                     .setTitleText("בחר טווח תאריכים")
@@ -107,9 +124,9 @@ public class DashboardActivity extends AppCompatActivity {
             picker.addOnPositiveButtonClickListener(selection -> {
                 long start = selection.first;
                 long rawEnd = selection.second;
-                long queryEnd = rawEnd + 86399999; // Add 23:59:59 to include the last day in DB query
+                long queryEnd = rawEnd + 86399999;
 
-                itemViewModel.getTransactionsByDateRange(userId, start, queryEnd).observe(this, transactions -> {
+                itemViewModel.getTransactionsByDateRange(warehouseId, start, queryEnd).observe(this, transactions -> {
                     if (transactions != null) {
                         adapter.setTransactions(transactions);
                         String status = "מציג מ-" + dateFormat.format(new Date(start)) + " עד " + dateFormat.format(new Date(rawEnd));
@@ -119,15 +136,13 @@ public class DashboardActivity extends AppCompatActivity {
             });
         });
 
-        // 4. Clear Filter Logic
-        buttonClear.setOnClickListener(v -> {
-            editSearch.setText("");
-            loadAllTransactions();
-        });
+        // 5. Cloud & Local Cleanup
+        itemViewModel.cleanOldTransactions(30, warehouseId);
     }
 
     private void loadAllTransactions() {
-        itemViewModel.getAllTransactions(userId).observe(this, transactions -> {
+        if (warehouseId == null) return;
+        itemViewModel.getAllTransactions(warehouseId).observe(this, transactions -> {
             if (transactions != null) {
                 adapter.setTransactions(transactions);
                 textFilterStatus.setText("מציג את כל הפעילויות");
