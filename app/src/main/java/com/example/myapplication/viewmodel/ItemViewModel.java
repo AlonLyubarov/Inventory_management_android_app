@@ -1,6 +1,7 @@
 package com.example.myapplication.viewmodel;
 
 import android.app.Application;
+import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
@@ -96,5 +97,25 @@ public class ItemViewModel extends AndroidViewModel {
 
     public void logoutOnly(Runnable onComplete) {
         mRepository.logoutOnly(onComplete);
+    }
+
+    /**
+     * Asynchronously purges all local Room SQLite tracking entity records during a deep data wipe operation.
+     * This utility leverages the static thread executor pre-configured on the centralized AppDatabase structural class.
+     */
+    public void clearLocalDatabase() {
+        com.example.myapplication.model.AppDatabase.databaseWriteExecutor.execute(() -> {
+            try {
+                // Initialize database framework link using the verified structural layout context instance
+                com.example.myapplication.model.AppDatabase db =
+                        com.example.myapplication.model.AppDatabase.getDatabase(this.getApplication());
+
+                // Clear the content of all structural entities natively mapped inside Room storage
+                db.clearAllTables();
+                Log.d("ItemViewModel", "Successfully dropped local Room SQLite tables records from storage context.");
+            } catch (Exception e) {
+                Log.e("ItemViewModel", "Fatal error occurred while executing direct clearAllTables cache purge execution", e);
+            }
+        });
     }
 }

@@ -38,6 +38,10 @@ dependencies {
     implementation libs.appcompat
     implementation libs.constraintlayout
     implementation libs.material
+    implementation libs.androidx.credentials
+    implementation libs.androidx.credentials.play.services.auth
+    implementation libs.googleid
+    implementation libs.google.play.services.auth
     testImplementation libs.junit
     androidTestImplementation libs.espresso.core
     androidTestImplementation libs.ext.junit

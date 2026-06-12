@@ -50,6 +50,13 @@
         android:text="Sign In"
         android:textAllCaps="false"/>
 
+    <!-- Google Sign In Button -->
+    <com.google.android.gms.common.SignInButton
+        android:id="@+id/button_google_login"
+        android:layout_width="match_parent"
+        android:layout_height="55dp"
+        android:layout_marginTop="16dp" />
+
     <!-- Link to Register Screen -->
     <TextView
         android:id="@+id/text_view_register"

@@ -1,8 +1,10 @@
 package com.example.myapplication.view;
+
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.SearchView;
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -25,6 +27,18 @@ import com.example.myapplication.model.User;
 import com.example.myapplication.viewmodel.ItemViewModel;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.auth.AuthCredential;
+import com.google.firebase.auth.EmailAuthProvider;
+import com.google.firebase.auth.GoogleAuthProvider;
+
+import androidx.credentials.Credential;
+import androidx.credentials.CredentialManager;
+import androidx.credentials.CustomCredential;
+import androidx.credentials.GetCredentialRequest;
+import androidx.credentials.GetCredentialResponse;
+import androidx.credentials.exceptions.GetCredentialException;
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption;
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,8 +51,9 @@ public class MainActivity extends AppCompatActivity {
     private AutoCompleteTextView autoTextName;
     private EditText editTextSku, editTextQuantity, editTextPrice, editTextBrand;
     private Button buttonAdd;
-    private int selectedThreshold = 0; 
+    private int selectedThreshold = 0;
     private User currentUser;
+    private CredentialManager credentialManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,6 +70,9 @@ public class MainActivity extends AppCompatActivity {
         }
 
         String currentUserId = fbUser.getUid();
+
+        // Initialize Jetpack Credential Manager instance
+        credentialManager = CredentialManager.create(this);
         itemViewModel = new ViewModelProvider(this).get(ItemViewModel.class);
 
         // UI references
@@ -75,27 +93,27 @@ public class MainActivity extends AppCompatActivity {
 
         // Initial Sync
         itemViewModel.syncFromCloud(currentUserId);
-        
+
         // DYNAMIC PROFILE & INVENTORY LOGIC
         itemViewModel.getUserProfile(currentUserId).observe(this, user -> {
             this.currentUser = user;
             if (user != null) {
                 applyPermissions(user.getRole());
-                
+
                 String warehouseId = user.getEmployerId();
                 if ("PENDING".equals(warehouseId)) {
                     buttonAdd.setEnabled(false);
                     buttonAdd.setText("ממתין לאישור מנהל...");
-                    adapter.setItems(new ArrayList<>()); 
+                    adapter.setItems(new ArrayList<>());
                 } else {
                     buttonAdd.setEnabled(true);
                     buttonAdd.setText("הוסף פריט");
-                    
+
                     // Observe items for the SPECIFIC warehouse this user belongs to
                     itemViewModel.getAllItems(warehouseId).observe(this, items -> {
                         if (items != null) adapter.setItems(items);
                     });
-                    
+
                     // Update autocomplete from shared templates
                     itemViewModel.getAllTemplates(warehouseId).observe(this, templates -> {
                         if (templates != null) {
@@ -123,9 +141,20 @@ public class MainActivity extends AppCompatActivity {
         adapter.setOnItemClickListener(new ItemAdapter.OnItemClickListener() {
             @Override
             public void onQuantityChange(Item item, int newQuantity) {
+                // Capture the authentic current state before any allocation modifications
                 int oldQuantity = item.getQuantity();
-                item.setQuantity(newQuantity);
-                itemViewModel.update(item, oldQuantity);
+
+                // CRITICAL FIX: Create a shallow clone/copy constructor layout instead of mutating the live reference.
+                // This ensures Room and DiffUtil can distinctively see the state variance between old and new lists.
+                Item updatedItem = new Item(item.getName(), item.getPrice(), newQuantity, item.getOwnerId(), item.getSku(), item.getBrand());
+
+                // Preserve all internal database/cloud tracking identifiers
+                updatedItem.setId(item.getId());
+                updatedItem.setFirestoreId(item.getFirestoreId());
+                updatedItem.setLowStockThreshold(item.getLowStockThreshold());
+
+                // Dispatch the clean detached model instance directly to the architecture pipeline
+                itemViewModel.update(updatedItem, oldQuantity);
             }
 
             @Override
@@ -156,7 +185,7 @@ public class MainActivity extends AppCompatActivity {
             // Use warehouse context for adding items
             String ownerId = (currentUser != null) ? currentUser.getEmployerId() : currentUserId;
             Item newItem = new Item(name, price, quantity, ownerId, sku, brand);
-            newItem.setLowStockThreshold(selectedThreshold); 
+            newItem.setLowStockThreshold(selectedThreshold);
             itemViewModel.insert(newItem);
 
             // Clear inputs
@@ -171,15 +200,15 @@ public class MainActivity extends AppCompatActivity {
 
     private void checkCloudProfile(String currentUserId) {
         com.google.firebase.firestore.FirebaseFirestore.getInstance()
-            .collection("users").document(currentUserId).get()
-            .addOnSuccessListener(doc -> {
-                if (!doc.exists()) {
-                    Toast.makeText(this, "יש להשלים את הגדרת הפרופיל", Toast.LENGTH_LONG).show();
-                    Intent intent = new Intent(MainActivity.this, RegisterActivity.class);
-                    startActivity(intent);
-                    finish();
-                }
-            });
+                .collection("users").document(currentUserId).get()
+                .addOnSuccessListener(doc -> {
+                    if (!doc.exists()) {
+                        Toast.makeText(this, "יש להשלים את הגדרת הפרופיל", Toast.LENGTH_LONG).show();
+                        Intent intent = new Intent(MainActivity.this, RegisterActivity.class);
+                        startActivity(intent);
+                        finish();
+                    }
+                });
     }
 
     private void applyPermissions(String role) {
@@ -191,7 +220,7 @@ public class MainActivity extends AppCompatActivity {
         editTextSku.setText(template.getSku());
         editTextPrice.setText(String.valueOf(template.getDefaultPrice()));
         editTextBrand.setText(template.getBrand());
-        selectedThreshold = template.getLowStockThreshold(); 
+        selectedThreshold = template.getLowStockThreshold();
         editTextQuantity.requestFocus();
     }
 
@@ -289,55 +318,210 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
+    /**
+     * Contextually builds the verification alert. If a Google provider is present,
+     * it directly invokes the OAuth flow rather than displaying a useless password field.
+     */
     private void showResetWithPasswordDialog() {
-        final EditText passwordInput = new EditText(this);
-        passwordInput.setHint("הזן את סיסמת החשבון שלך");
-        passwordInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
-
-        new AlertDialog.Builder(this)
-                .setTitle("איפוס משתמש סופי")
-                .setMessage("כדי למחוק את הפרופיל שלך מהענן ולהירשם מחדש, הזן את סיסמת ההתחברות שלך:")
-                .setView(passwordInput)
-                .setPositiveButton("אמת ואפס", (dialog, which) -> {
-                    String pwd = passwordInput.getText().toString();
-                    if (pwd.isEmpty()) {
-                        Toast.makeText(this, "נא להזין סיסמה", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-                    verifyPasswordAndReset(pwd);
-                })
-                .setNegativeButton("ביטול", null)
-                .show();
-    }
-
-    private void verifyPasswordAndReset(String password) {
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null || user.getEmail() == null) return;
+        if (user == null) return;
 
-        com.google.firebase.auth.AuthCredential credential = 
-            com.google.firebase.auth.EmailAuthProvider.getCredential(user.getEmail(), password);
-
-        Toast.makeText(this, "מאמת סיסמה...", Toast.LENGTH_SHORT).show();
-        
-        user.reauthenticate(credential).addOnCompleteListener(task -> {
-            if (task.isSuccessful()) {
-                performDeepReset();
-            } else {
-                Toast.makeText(this, "סיסמה שגויה! האיפוס בוטל.", Toast.LENGTH_LONG).show();
+        boolean isGoogleUser = false;
+        for (com.google.firebase.auth.UserInfo profile : user.getProviderData()) {
+            if (profile.getProviderId().equals("google.com")) {
+                isGoogleUser = true;
+                break;
             }
-        });
+        }
+
+        // Contextual branching: If user is Google-backed, skip text dialog setup completely
+        if (isGoogleUser) {
+            new AlertDialog.Builder(this)
+                    .setTitle("איפוס משתמש סופי")
+                    .setMessage("כדי למחוק את הפרופיל שלך מהענן, עליך לבצע אימות קצר מול גוגל.")
+                    .setPositiveButton("המשך לאימות", (dialog, which) -> verifyAndPerformReset(""))
+                    .setNegativeButton("ביטול", null)
+                    .show();
+        } else {
+            final EditText passwordInput = new EditText(this);
+            passwordInput.setHint("הזן את סיסמת החשבון שלך");
+            passwordInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+
+            new AlertDialog.Builder(this)
+                    .setTitle("איפוס משתמש סופי")
+                    .setMessage("כדי למחוק את הפרופיל שלך מהענן ולהירשם מחדש, הזן את סיסמת ההתחברות שלך:")
+                    .setView(passwordInput)
+                    .setPositiveButton("אמת ואפס", (dialog, which) -> {
+                        String pwd = passwordInput.getText().toString();
+                        if (pwd.isEmpty()) {
+                            Toast.makeText(this, "נא להזין סיסמה", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        verifyAndPerformReset(pwd);
+                    })
+                    .setNegativeButton("ביטול", null)
+                    .show();
+        }
     }
 
-    private void performDeepReset() {
-        Toast.makeText(this, "מבצע איפוס, נא להמתין...", Toast.LENGTH_SHORT).show();
-        itemViewModel.logoutAndReset(() -> {
-            runOnUiThread(() -> {
-                Toast.makeText(MainActivity.this, "האיפוס הושלם. נא להירשם מחדש.", Toast.LENGTH_SHORT).show();
-                Intent intent = new Intent(MainActivity.this, LoginActivity.class);
-                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                startActivity(intent);
-                finish();
+    /**
+     * Verifies the user's identity based on their sign-in provider before performing a sensitive deep reset operation.
+     * If the user is a Google user, it triggers the Credential Manager re-authentication flow.
+     * If the user is a standard email/password user, it validates the provided password string.
+     *
+     * @param passwordIfEmailUser The password entered by the user (applicable only for email/password accounts).
+     */
+    private void verifyAndPerformReset(String passwordIfEmailUser) {
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user == null) return;
+
+        // Flag to determine if the currently logged-in account linked its primary provider via Google
+        boolean isGoogleUser = false;
+
+        // Iterate through all linked provider profiles associated with this Firebase account
+        for (com.google.firebase.auth.UserInfo profile : user.getProviderData()) {
+            if (profile.getProviderId().equals("google.com")) {
+                isGoogleUser = true;
+                break;
+            }
+        }
+
+        if (isGoogleUser) {
+            // Scenario A: Google Sign-In account detected.
+            // Google accounts do not store passwords in Firebase. We must prompt the user to re-verify using Credential Manager.
+            Toast.makeText(this, "Please authenticate your Google account...", Toast.LENGTH_SHORT).show();
+            reauthenticateGoogleUserAndReset();
+        } else {
+            // Scenario B: Traditional Email/Password account detected.
+            if (passwordIfEmailUser.isEmpty()) {
+                Toast.makeText(this, "Please enter your password for verification.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            // Generate a standard email password credential wrapper using the provided string
+            AuthCredential credential = EmailAuthProvider.getCredential(user.getEmail(), passwordIfEmailUser);
+
+            // Execute Firebase cloud re-authentication challenge
+            user.reauthenticate(credential).addOnCompleteListener(task -> {
+                if (task.isSuccessful()) {
+                    // Verification succeeded; execute the secure deep reset routing routine
+                    performDeepReset();
+                } else {
+                    Toast.makeText(this, "Incorrect password! Reset canceled.", Toast.LENGTH_LONG).show();
+                }
             });
-        });
+        }
     }
-}
+
+    /**
+     * Re-authenticates a Google provider user by launching the modern Jetpack Credential Manager bottom sheet.
+     * Upon receiving a valid new ID token bundle from Google, it submits it to Firebase to secure the session.
+     */
+    private void reauthenticateGoogleUserAndReset() {
+        // 1. Configure the Google ID option. We set filter criteria to true to focus only on the pre-authorized active account.
+        GetGoogleIdOption googleIdOption = new GetGoogleIdOption.Builder()
+                .setFilterByAuthorizedAccounts(true)
+                .setServerClientId(getString(R.string.default_web_client_id))
+                .build();
+
+        // 2. Build the structural aggregate credential request container
+        GetCredentialRequest request = new GetCredentialRequest.Builder()
+                .addCredentialOption(googleIdOption)
+                .build();
+
+        // 3. Fire the asynchronous request using the Java compatibility layer API
+        credentialManager.getCredentialAsync(
+                this,
+                request,
+                new android.os.CancellationSignal(), // Allows optional task termination management
+                androidx.core.content.ContextCompat.getMainExecutor(this), // Forces callback responses to execute on the Main UI Thread
+                new androidx.credentials.CredentialManagerCallback<GetCredentialResponse, GetCredentialException>() {
+                    @Override
+                    public void onResult(GetCredentialResponse result) {
+                        Credential credential = result.getCredential();
+
+                        // Validate that the returned payload conforms to the expected Custom Google ID Token template type
+                        if (credential instanceof CustomCredential &&
+                                credential.getType().equals(GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL)) {
+
+                            try {
+                                // Extract the refreshed authorization ID token string securely from the underlying data Bundle
+                                GoogleIdTokenCredential googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.getData());
+                                String idToken = googleIdTokenCredential.getIdToken();
+
+                                // Map the newly acquired token to an actual Firebase AuthCredential token object instance
+                                AuthCredential firebaseCredential = GoogleAuthProvider.getCredential(idToken, null);
+
+                                // Submit the fresh token to Firebase to re-authenticate the current runtime user context session
+                                FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+                                if (currentUser != null) {
+                                    currentUser.reauthenticate(firebaseCredential).addOnCompleteListener(reauthTask -> {
+                                        if (reauthTask.isSuccessful()) {
+                                            // Identity verified successfully via Google OAuth! Proceed with deep clear routines
+                                            performDeepReset();
+                                        } else {
+                                            Toast.makeText(MainActivity.this, "Google server re-authentication failed.", Toast.LENGTH_SHORT).show();
+                                        }
+                                    });
+                                }
+                            } catch (Exception e) {
+                                Log.e("AuthReset", "Error mapping structural Google credentials bundle data payload", e);
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onError(GetCredentialException e) {
+                        // Triggered if the user dismisses the bottom sheet prompt or explicitly cancels the operation
+                        Toast.makeText(MainActivity.this, "Re-authentication canceled by user.", Toast.LENGTH_SHORT).show();
+                    }
+                }
+        );
+    }
+    /**
+     * Handles the final deep reset phase by removing user metadata from Cloud Firestore,
+     * purging the local Room SQLite inventory database caches via ViewModel, and deleting the Auth account records.
+     */
+    private void performDeepReset() {
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+
+        if (user != null) {
+            String uid = user.getUid();
+            Toast.makeText(this, "Deleting profile from cloud...", Toast.LENGTH_SHORT).show();
+
+            // 1. Delete the user's profile document inside Cloud Firestore
+            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("users")
+                    .document(uid)
+                    .delete()
+                    .addOnCompleteListener(firestoreTask -> {
+
+                        // 2. Clear the local Room SQLite inventory data storage using the ViewModel framework pipeline
+                        itemViewModel.clearLocalDatabase();
+                        Log.d("AuthReset", "Fired asynchronous request to flush Room entities through ViewModel architecture.");
+
+                        // 3. Execute the final account deletion command from Firebase Authentication servers
+                        user.delete().addOnCompleteListener(authTask -> {
+                            if (authTask.isSuccessful()) {
+                                Toast.makeText(MainActivity.this, "Account successfully deleted.", Toast.LENGTH_SHORT).show();
+
+                                // Sign out from active instance token session context
+                                FirebaseAuth.getInstance().signOut();
+
+                                // Route back to LoginActivity and flush the memory backstack pipeline
+                                Intent intent = new Intent(MainActivity.this, LoginActivity.class);
+                                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                                startActivity(intent);
+                                finish(); // Terminate the current MainActivity lifecycle context completely
+                            } else {
+                                // Triggered if the active operational token expired or structural handshake validation failed
+                                Log.e("AuthReset", "Failed to delete user cloud authentication account logs", authTask.getException());
+                                Toast.makeText(MainActivity.this, "Error deleting account: " + authTask.getException().getMessage(), Toast.LENGTH_LONG).show();
+                            }
+                        });
+
+                    });
+        }
+    }
+
+  }

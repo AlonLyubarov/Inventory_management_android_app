@@ -42,10 +42,14 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemHolder> {
 
     @Override
     public void onBindViewHolder(@NonNull ItemHolder holder, int position) {
-        Item currentItem = items.get(position);
-        
+        // Fallback to standard getAdapterPosition() for backwards compatibility support
+        int currentPos = holder.getAdapterPosition();
+        if (currentPos == RecyclerView.NO_POSITION) return;
+
+        Item currentItem = items.get(currentPos);
+
         holder.textViewName.setText(currentItem.getName());
-        
+
         if (currentItem.getSku() != null && !currentItem.getSku().isEmpty()) {
             holder.textViewSku.setVisibility(View.VISIBLE);
             holder.textViewSku.setText("מק''ט: " + currentItem.getSku());
@@ -55,12 +59,12 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemHolder> {
 
         int quantity = currentItem.getQuantity();
         int threshold = currentItem.getLowStockThreshold();
-        
+
         holder.textViewQuantity.setText(String.valueOf(quantity));
 
-        // Low Stock Alert Logic
+        // Low Stock Alert Logic Layout Engine execution
         if (threshold > 0 && quantity < threshold) {
-            holder.itemView.findViewById(R.id.item_card_container).setBackgroundColor(0xFFFFEBEE); 
+            holder.itemView.findViewById(R.id.item_card_container).setBackgroundColor(0xFFFFEBEE);
             holder.textViewQuantity.setTextColor(0xFFD32F2F);
             holder.textViewName.setText("⚠️ " + currentItem.getName() + " (מלאי נמוך!)");
         } else {
@@ -70,25 +74,41 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemHolder> {
         }
 
         holder.textViewPrice.setText(String.format(Locale.getDefault(), "₪%.2f", currentItem.getPrice()));
-        
+
         double total = quantity * currentItem.getPrice();
         holder.textViewTotalPrice.setText(String.format(Locale.getDefault(), "סה\"כ שווי: ₪%.2f", total));
 
+        // Asynchronous structural click interactions bindings setup with live evaluation
         holder.buttonPlus.setOnClickListener(v -> {
             if (listener != null) {
-                listener.onQuantityChange(currentItem, quantity + 1);
+                int safePos = holder.getAdapterPosition();
+                if (safePos != RecyclerView.NO_POSITION) {
+                    Item liveItem = items.get(safePos);
+                    // Dynamically evaluate the absolute live value inside model storage
+                    listener.onQuantityChange(liveItem, liveItem.getQuantity() + 1);
+                }
             }
         });
 
         holder.buttonMinus.setOnClickListener(v -> {
-            if (listener != null && quantity > 0) {
-                listener.onQuantityChange(currentItem, quantity - 1);
+            if (listener != null) {
+                int safePos = holder.getAdapterPosition();
+                if (safePos != RecyclerView.NO_POSITION) {
+                    Item liveItem = items.get(safePos);
+                    int liveQty = liveItem.getQuantity();
+                    if (liveQty > 0) {
+                        listener.onQuantityChange(liveItem, liveQty - 1);
+                    }
+                }
             }
         });
 
         holder.buttonDelete.setOnClickListener(v -> {
             if (listener != null) {
-                listener.onDeleteClick(currentItem);
+                int safePos = holder.getAdapterPosition();
+                if (safePos != RecyclerView.NO_POSITION) {
+                    listener.onDeleteClick(items.get(safePos));
+                }
             }
         });
     }
@@ -129,7 +149,6 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemHolder> {
 
         @Override
         public boolean areItemsTheSame(int oldPos, int newPos) {
-            // Compare items by their database IDs or firestore IDs
             return oldList.get(oldPos).getId() == newList.get(newPos).getId();
         }
 
@@ -137,10 +156,9 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemHolder> {
         public boolean areContentsTheSame(int oldPos, int newPos) {
             Item oldItem = oldList.get(oldPos);
             Item newItem = newList.get(newPos);
-            // Check if any visual property has changed
             return oldItem.getQuantity() == newItem.getQuantity() &&
-                   oldItem.getPrice() == newItem.getPrice() &&
-                   oldItem.getName().equals(newItem.getName());
+                    oldItem.getPrice() == newItem.getPrice() &&
+                    oldItem.getName().equals(newItem.getName());
         }
     }
 
