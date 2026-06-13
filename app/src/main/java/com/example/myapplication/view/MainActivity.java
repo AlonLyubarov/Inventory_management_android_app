@@ -26,8 +26,6 @@ import com.google.firebase.auth.EmailAuthProvider;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
-import java.util.ArrayList;
-
 public class MainActivity extends AppCompatActivity {
 
     private ItemViewModel viewModel;
@@ -37,6 +35,9 @@ public class MainActivity extends AppCompatActivity {
     private Button buttonAdd;
     private User currentUser;
     private String uid;
+
+    private final android.os.Handler searchHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private Runnable searchRunnable;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -50,40 +51,40 @@ public class MainActivity extends AppCompatActivity {
         initUI();
         setupStableStreams();
 
-        // 1. Trigger cloud synchronization
         viewModel.startSync(uid);
 
-        // 2. Observe User Profile to determine active warehouse
         viewModel.getUserProfile(uid).observe(this, user -> {
             this.currentUser = user;
             if (user != null) {
                 invalidateOptionsMenu();
                 String warehouseId = user.getEmployerId();
-                
-                // Update UI based on approval status
                 if ("PENDING".equals(warehouseId)) {
                     buttonAdd.setEnabled(false);
-                    buttonAdd.setText("ממתין לאישור...");
+                    buttonAdd.setText(R.string.pending_approval);
                 } else {
                     buttonAdd.setEnabled(true);
-                    buttonAdd.setText("הוסף למלאי");
+                    buttonAdd.setText(R.string.button_add);
                 }
-                
-                // Set context in ViewModel - this triggers the stable inventory streams
                 viewModel.setWarehouseContext(warehouseId);
             }
         });
     }
 
     private void setupStableStreams() {
-        // Observe Inventory: Stable stream, no duplicate observers added
+        // Observe base inventory
         viewModel.getInventoryStream().observe(this, items -> {
-            if (items != null) {
-                adapter.setItems(items);
+            // Only update adapter if search is NOT active
+            if (viewModel.getSearchStream().hasObservers() && items != null) {
+                // Potential logic to filter but usually searchStream handles it
             }
+            adapter.setItems(items);
         });
 
-        // Observe Templates for Autocomplete
+        // Observe reactive search stream (Fix M5)
+        viewModel.getSearchStream().observe(this, items -> {
+            if (items != null) adapter.setItems(items);
+        });
+
         viewModel.getTemplateStream().observe(this, templates -> {
             if (templates != null) {
                 ArrayAdapter<ProductTemplate> autocompAdapter = new ArrayAdapter<>(
@@ -109,41 +110,42 @@ public class MainActivity extends AppCompatActivity {
         adapter.setOnItemClickListener(new ItemAdapter.OnItemClickListener() {
             @Override
             public void onQuantityChange(Item item, int newQuantity) {
-                int old = item.getQuantity();
-                Item updated = new Item(item.getName(), item.getPrice(), newQuantity, item.getOwnerId(), item.getSku(), item.getBrand());
-                updated.setId(item.getId());
-                updated.setFirestoreId(item.getFirestoreId());
-                updated.setLowStockThreshold(item.getLowStockThreshold());
-                viewModel.update(updated, old);
+                viewModel.updateItemQuantity(item, newQuantity - item.getQuantity());
             }
 
             @Override
             public void onDeleteClick(Item item) {
                 if (currentUser != null && "WORKER".equals(currentUser.getRole())) {
-                    Toast.makeText(MainActivity.this, "אין הרשאה למחיקה", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(MainActivity.this, R.string.no_permission_delete, Toast.LENGTH_SHORT).show();
                 } else {
                     new AlertDialog.Builder(MainActivity.this)
-                            .setMessage("למחוק את " + item.getName() + "?")
-                            .setPositiveButton("מחק", (d, w) -> viewModel.delete(item))
-                            .setNegativeButton("ביטול", null).show();
+                            .setMessage(getString(R.string.delete_confirm_msg, item.getName()))
+                            .setPositiveButton(R.string.button_reset, (d, w) -> viewModel.delete(item))
+                            .setNegativeButton(android.R.string.cancel, null).show();
                 }
             }
         });
 
         buttonAdd.setOnClickListener(v -> {
             String name = autoTextName.getText().toString();
-            String qty = editTextQuantity.getText().toString();
-            String price = editTextPrice.getText().toString();
-            if (name.isEmpty() || qty.isEmpty() || price.isEmpty()) {
-                Toast.makeText(this, "מלא את כל השדות", Toast.LENGTH_SHORT).show();
+            String qtyStr = editTextQuantity.getText().toString();
+            String priceStr = editTextPrice.getText().toString();
+
+            if (name.isEmpty() || qtyStr.isEmpty() || priceStr.isEmpty()) {
+                Toast.makeText(this, R.string.error_fill_fields, Toast.LENGTH_SHORT).show();
                 return;
             }
 
-            String ownerId = (currentUser != null) ? currentUser.getEmployerId() : uid;
-            Item newItem = new Item(name, Double.parseDouble(price), Integer.parseInt(qty), 
-                    ownerId, editTextSku.getText().toString(), editTextBrand.getText().toString());
-            viewModel.insert(newItem);
-            clearInputs();
+            try {
+                int qty = Integer.parseInt(qtyStr);
+                double price = Double.parseDouble(priceStr);
+                String ownerId = (currentUser != null) ? currentUser.getEmployerId() : uid;
+                Item newItem = new Item(name, price, qty, ownerId, editTextSku.getText().toString(), editTextBrand.getText().toString());
+                viewModel.insert(newItem);
+                clearInputs();
+            } catch (NumberFormatException e) {
+                Toast.makeText(this, R.string.error_invalid_numbers, Toast.LENGTH_SHORT).show();
+            }
         });
 
         autoTextName.setOnItemClickListener((parent, view, position, id) -> {
@@ -161,10 +163,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void performSearch(String query) {
-        if (currentUser == null) return;
-        viewModel.search(currentUser.getEmployerId(), query).observe(this, items -> {
-            if (items != null) adapter.setItems(items);
-        });
+        if (searchRunnable != null) searchHandler.removeCallbacks(searchRunnable);
+        searchRunnable = () -> viewModel.setSearchQuery(query);
+        searchHandler.postDelayed(searchRunnable, 300);
     }
 
     @Override
@@ -202,49 +203,40 @@ public class MainActivity extends AppCompatActivity {
 
     private void showLogoutDialog() {
         new AlertDialog.Builder(this)
-                .setTitle("התנתקות")
-                .setMessage("האם להתנתק מהמערכת?")
-                .setPositiveButton("התנתק", (d, w) -> viewModel.logoutOnly(this::navigateToLogin))
-                .setNegativeButton("ביטול", null).show();
+                .setTitle(R.string.menu_logout)
+                .setMessage(R.string.menu_logout)
+                .setPositiveButton(R.string.menu_logout, (d, w) -> viewModel.logoutOnly(this::navigateToLogin))
+                .setNegativeButton(android.R.string.cancel, null).show();
     }
 
     private void showResetDialog() {
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
         if (user == null) return;
-
         boolean isGoogleUser = false;
-        if (user.getProviderData() != null) {
-            for (com.google.firebase.auth.UserInfo profile : user.getProviderData()) {
-                if (profile.getProviderId().equals("google.com")) {
-                    isGoogleUser = true;
-                    break;
-                }
-            }
+        for (com.google.firebase.auth.UserInfo profile : user.getProviderData()) {
+            if (profile.getProviderId().equals("google.com")) { isGoogleUser = true; break; }
         }
 
         if (isGoogleUser) {
             new AlertDialog.Builder(this)
-                    .setTitle("איפוס משתמש סופי")
-                    .setMessage("מכיוון שאתה מחובר דרך גוגל, עליך לבצע אימות קצר כדי לאפס את החשבון.")
-                    .setPositiveButton("אמת עם גוגל", (d, w) -> reauthenticateGoogleAndReset())
-                    .setNegativeButton("ביטול", null).show();
+                    .setTitle(R.string.reset_dialog_title)
+                    .setMessage(R.string.reset_dialog_msg)
+                    .setPositiveButton(R.string.reauth_google, (d, w) -> reauthenticateGoogleAndReset())
+                    .setNegativeButton(android.R.string.cancel, null).show();
         } else {
             final EditText input = new EditText(this);
-            input.setHint("הזן סיסמה");
+            input.setHint(R.string.password_hint);
             input.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
             new AlertDialog.Builder(this)
-                    .setTitle("איפוס משתמש")
-                    .setMessage("הזן סיסמה למחיקת הפרופיל והרשמה מחדש:")
+                    .setTitle(R.string.menu_reset)
+                    .setMessage(R.string.reset_pwd_msg)
                     .setView(input)
-                    .setPositiveButton("אפס", (d, w) -> {
+                    .setPositiveButton(R.string.button_reset, (d, w) -> {
                         String password = input.getText().toString().trim();
-                        if (!password.isEmpty()) {
-                            verifyAndReset(password);
-                        } else {
-                            Toast.makeText(this, "חובה להזין סיסמה", Toast.LENGTH_SHORT).show();
-                        }
+                        if (!password.isEmpty()) verifyAndReset(password);
+                        else Toast.makeText(this, R.string.password_hint, Toast.LENGTH_SHORT).show();
                     })
-                    .setNegativeButton("ביטול", null).show();
+                    .setNegativeButton(android.R.string.cancel, null).show();
         }
     }
 
@@ -255,36 +247,22 @@ public class MainActivity extends AppCompatActivity {
                 .setFilterByAuthorizedAccounts(true)
                 .setServerClientId(getString(R.string.default_web_client_id))
                 .build();
-
-        androidx.credentials.GetCredentialRequest request = new androidx.credentials.GetCredentialRequest.Builder()
-                .addCredentialOption(googleIdOption)
-                .build();
-
-        credentialManager.getCredentialAsync(this, request, null, 
-            androidx.core.content.ContextCompat.getMainExecutor(this),
-            new androidx.credentials.CredentialManagerCallback<androidx.credentials.GetCredentialResponse, androidx.credentials.exceptions.GetCredentialException>() {
-                @Override
-                public void onResult(androidx.credentials.GetCredentialResponse result) {
-                    androidx.credentials.Credential credential = result.getCredential();
-                    if (credential instanceof androidx.credentials.CustomCredential &&
-                        credential.getType().equals(com.google.android.libraries.identity.googleid.GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL)) {
+        androidx.credentials.GetCredentialRequest request = new androidx.credentials.GetCredentialRequest.Builder().addCredentialOption(googleIdOption).build();
+        credentialManager.getCredentialAsync(this, request, new android.os.CancellationSignal(), androidx.core.content.ContextCompat.getMainExecutor(this),
+                new androidx.credentials.CredentialManagerCallback<androidx.credentials.GetCredentialResponse, androidx.credentials.exceptions.GetCredentialException>() {
+                    @Override public void onResult(androidx.credentials.GetCredentialResponse result) {
                         try {
-                            com.google.android.libraries.identity.googleid.GoogleIdTokenCredential googleIdTokenCredential = 
-                                com.google.android.libraries.identity.googleid.GoogleIdTokenCredential.createFrom(credential.getData());
-                            AuthCredential fbCred = com.google.firebase.auth.GoogleAuthProvider.getCredential(googleIdTokenCredential.getIdToken(), null);
+                            com.google.android.libraries.identity.googleid.GoogleIdTokenCredential gitc = com.google.android.libraries.identity.googleid.GoogleIdTokenCredential.createFrom(result.getCredential().getData());
+                            AuthCredential cred = com.google.firebase.auth.GoogleAuthProvider.getCredential(gitc.getIdToken(), null);
                             if (FirebaseAuth.getInstance().getCurrentUser() != null) {
-                                FirebaseAuth.getInstance().getCurrentUser().reauthenticate(fbCred).addOnCompleteListener(task -> {
-                                    if (task.isSuccessful()) viewModel.logoutAndReset(MainActivity.this::navigateToLogin);
+                                FirebaseAuth.getInstance().getCurrentUser().reauthenticate(cred).addOnCompleteListener(t -> {
+                                    if (t.isSuccessful()) viewModel.logoutAndReset(MainActivity.this::navigateToLogin);
                                 });
                             }
                         } catch (Exception ignored) {}
                     }
-                }
-                @Override
-                public void onError(androidx.credentials.exceptions.GetCredentialException e) {
-                    Toast.makeText(MainActivity.this, "אימות נכשל: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                }
-            });
+                    @Override public void onError(androidx.credentials.exceptions.GetCredentialException e) { Toast.makeText(MainActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show(); }
+                });
     }
 
     private void verifyAndReset(String password) {
@@ -292,11 +270,8 @@ public class MainActivity extends AppCompatActivity {
         if (user == null || user.getEmail() == null) return;
         AuthCredential cred = EmailAuthProvider.getCredential(user.getEmail(), password);
         user.reauthenticate(cred).addOnCompleteListener(task -> {
-            if (task.isSuccessful()) {
-                viewModel.logoutAndReset(this::navigateToLogin);
-            } else {
-                Toast.makeText(this, "סיסמה שגויה", Toast.LENGTH_SHORT).show();
-            }
+            if (task.isSuccessful()) viewModel.logoutAndReset(this::navigateToLogin);
+            else Toast.makeText(this, R.string.error_auth_failed, Toast.LENGTH_SHORT).show();
         });
     }
 

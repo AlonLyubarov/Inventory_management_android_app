@@ -3,17 +3,22 @@ package com.example.myapplication.model;
 import androidx.lifecycle.LiveData;
 import androidx.room.Dao;
 import androidx.room.Insert;
+import androidx.room.OnConflictStrategy;
 import androidx.room.Query;
 
 import java.util.List;
 
 @Dao
 public interface TransactionDao {
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     void insert(Transaction transaction);
 
-    // I increased the limit or ensured no limit is present. 
-    // By default Room has no limit, but we will explicitly order and ensure we get all data.
+    @Query("DELETE FROM transactions_table WHERE firestoreId = :fid")
+    void deleteByFirestoreId(String fid);
+
+    @Query("SELECT * FROM transactions_table WHERE firestoreId = :fid LIMIT 1")
+    Transaction getByFirestoreId(String fid);
+
     @Query("SELECT * FROM transactions_table WHERE ownerId = :userId AND itemName LIKE :query ORDER BY timestamp DESC")
     LiveData<List<Transaction>> searchTransactions(String userId, String query);
 

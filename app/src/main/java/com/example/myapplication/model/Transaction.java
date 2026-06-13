@@ -1,11 +1,12 @@
 package com.example.myapplication.model;
 
 import androidx.room.Entity;
+import androidx.room.Index;
 import androidx.room.PrimaryKey;
 import com.google.firebase.firestore.Exclude;
 import com.google.firebase.firestore.IgnoreExtraProperties;
 
-@Entity(tableName = "transactions_table")
+@Entity(tableName = "transactions_table", indices = {@Index(value = {"firestoreId"}, unique = true)})
 @IgnoreExtraProperties
 public class Transaction {
     @PrimaryKey(autoGenerate = true)

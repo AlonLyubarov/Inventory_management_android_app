@@ -72,11 +72,15 @@ public class CatalogActivity extends AppCompatActivity {
                 return;
             }
 
-            ProductTemplate t = new ProductTemplate(name, sku, Double.parseDouble(price), warehouseId, editBrand.getText().toString().trim());
-            t.setLowStockThreshold(editThreshold.getText().toString().isEmpty() ? 0 : Integer.parseInt(editThreshold.getText().toString()));
-            
-            viewModel.upsertTemplate(t);
-            editName.setText(""); editSku.setText(""); editBrand.setText(""); editPrice.setText(""); editThreshold.setText("");
+            try {
+                ProductTemplate t = new ProductTemplate(name, sku, Double.parseDouble(price), warehouseId, editBrand.getText().toString().trim());
+                t.setLowStockThreshold(editThreshold.getText().toString().isEmpty() ? 0 : Integer.parseInt(editThreshold.getText().toString()));
+                
+                viewModel.upsertTemplate(t);
+                editName.setText(""); editSku.setText(""); editBrand.setText(""); editPrice.setText(""); editThreshold.setText("");
+            } catch (NumberFormatException e) {
+                Toast.makeText(this, "נא להזין מספרים תקינים", Toast.LENGTH_SHORT).show();
+            }
         });
 
         adapter.setOnCatalogClickListener(t -> {

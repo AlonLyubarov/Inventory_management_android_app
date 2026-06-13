@@ -36,6 +36,9 @@ public interface ItemDao {
     @Delete
     void delete(Item item);
 
+    @Query("DELETE FROM items_table WHERE firestoreId = :firestoreId")
+    void deleteByFirestoreId(String firestoreId);
+
     @Query("DELETE FROM items_table")
     void deleteAllItems();
 
@@ -47,6 +50,9 @@ public interface ItemDao {
 
     @Query("SELECT * FROM items_table WHERE firestoreId = :firestoreId LIMIT 1")
     Item getItemByFirestoreId(String firestoreId);
+
+    @Query("SELECT * FROM items_table WHERE ownerId = :userId AND sku = :sku AND name = :name LIMIT 1")
+    Item getItemBySkuAndName(String userId, String sku, String name);
 
     @Query("SELECT * FROM items_table WHERE ownerId = :userId AND sku = :sku LIMIT 1")
     Item getItemBySku(String userId, String sku);

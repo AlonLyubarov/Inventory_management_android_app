@@ -1,4 +1,59 @@
 <resources>
-    <string name="app_name">My Application</string>
+    <string name="app_name">מערכת ניהול מלאי</string>
     <string name="default_web_client_id">402627971715-h2mtimk2o9m0mh8qucundl442i813a40.apps.googleusercontent.com</string>
+
+    <!-- Navigation & Menu -->
+    <string name="menu_dashboard">לוח בקרה</string>
+    <string name="menu_catalog">קטלוג</string>
+    <string name="menu_reports">דוחות</string>
+    <string name="menu_manage_team">ניהול צוות</string>
+    <string name="menu_logout">התנתקות</string>
+    <string name="menu_reset">איפוס משתמש</string>
+
+    <!-- MainActivity -->
+    <string name="add_item_title">הוספת פריט למלאי</string>
+    <string name="item_name_hint">שם הפריט</string>
+    <string name="sku_hint">מק\'\'ט</string>
+    <string name="brand_hint">מותג</string>
+    <string name="quantity_hint">כמות</string>
+    <string name="price_hint">מחיר ₪</string>
+    <string name="button_add">הוסף למלאי</string>
+    <string name="error_fill_fields">מלא את כל השדות</string>
+    <string name="error_invalid_numbers">נא להזין מספרים תקינים בלבד</string>
+    <string name="pending_approval">ממתין לאישור&#8230;</string>
+    <string name="delete_confirm_msg">למחוק את %s?</string>
+    <string name="no_permission_delete">אין הרשאה למחיקה</string>
+
+    <!-- Login & Register -->
+    <string name="login_title">כניסה למערכת</string>
+    <string name="login_button">התחבר</string>
+    <string name="register_link">אין לך חשבון? הרשם כאן</string>
+    <string name="register_title">רישום עובד חדש</string>
+    <string name="full_name_hint">שם מלא של העובד</string>
+    <string name="email_hint">כתובת אימייל</string>
+    <string name="password_hint">סיסמה (8+ תווים)</string>
+    <string name="role_label">תפקיד העובד במערכת:</string>
+    <string name="button_create_account">צור חשבון לעובד</string>
+    <string name="success_profile_created">הפרופיל נוצר בהצלחה</string>
+    <string name="error_auth_failed">התחברות נכשלה</string>
+
+    <!-- Reset Dialogs -->
+    <string name="reset_dialog_title">איפוס משתמש סופי</string>
+    <string name="reset_dialog_msg">מכיוון שאתה מחובר דרך גוגל, עליך לבצע אימות קצר כדי לאפס את החשבון.</string>
+    <string name="reset_pwd_msg">הזן סיסמה למחיקת הפרופיל והרשמה מחדש:</string>
+    <string name="button_reset">אפס</string>
+    <string name="reauth_google">אמת עם גוגל</string>
+
+    <!-- Dashboard & Team -->
+    <string name="dashboard_title">לוח בקרה ופעילות</string>
+    <string name="total_items_label">סה\'\'כ פריטים</string>
+    <string name="total_value_label">שווי המלאי</string>
+    <string name="search_history_hint">חפש בהיסטוריית פעולות&#8230;</string>
+    <string name="button_date_range">בחר טווח תאריכים</string>
+    <string name="team_title">ניהול הרשאות צוות</string>
+    <string name="add_worker_title">צירוף עובד חדש</string>
+    <string name="worker_email_hint">אימייל העובד</string>
+    <string name="button_link_worker">צרף</string>
+    <string name="my_team_label">הצוות שלי</string>
+
 </resources>

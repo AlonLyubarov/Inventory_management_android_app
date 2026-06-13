@@ -10,6 +10,8 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
 import androidx.core.util.Pair;
+import androidx.lifecycle.LiveData;
+import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.example.myapplication.R;
@@ -68,19 +70,35 @@ public class ReportsActivity extends AppCompatActivity {
 
     private void exportInventory(boolean isCsv) {
         if (warehouseId == null) return;
-        viewModel.getInventory(warehouseId).observe(this, items -> {
-            if (items == null || items.isEmpty()) return;
-            if (isCsv) generateInventoryCsv(items);
-            else generateInventoryPdf(items);
+        
+        // Fix C4: Use one-time observer to prevent leaks and multiple triggers
+        LiveData<List<Item>> liveData = viewModel.getInventory(warehouseId);
+        liveData.observe(this, new androidx.lifecycle.Observer<List<Item>>() {
+            @Override
+            public void onChanged(List<Item> items) {
+                liveData.removeObserver(this);
+                if (items != null && !items.isEmpty()) {
+                    if (isCsv) generateInventoryCsv(items);
+                    else generateInventoryPdf(items);
+                }
+            }
         });
     }
 
     private void exportTransactions(boolean isCsv) {
         if (warehouseId == null || selectedStartDate == 0) return;
-        viewModel.getTransactionsRange(warehouseId, selectedStartDate, selectedEndDate).observe(this, logs -> {
-            if (logs == null || logs.isEmpty()) return;
-            if (isCsv) generateTransactionsCsv(logs);
-            else generateTransactionsPdf(logs);
+        
+        // Fix C4: One-time observer for transactions
+        LiveData<List<Transaction>> liveData = viewModel.getTransactionsRange(warehouseId, selectedStartDate, selectedEndDate);
+        liveData.observe(this, new androidx.lifecycle.Observer<List<Transaction>>() {
+            @Override
+            public void onChanged(List<Transaction> logs) {
+                liveData.removeObserver(this);
+                if (logs != null && !logs.isEmpty()) {
+                    if (isCsv) generateTransactionsCsv(logs);
+                    else generateTransactionsPdf(logs);
+                }
+            }
         });
     }
 

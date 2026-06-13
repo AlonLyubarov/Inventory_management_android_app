@@ -44,6 +44,9 @@ public class TransactionAdapter extends RecyclerView.Adapter<TransactionAdapter.
         String dateString = DateFormat.format("dd/MM/yy HH:mm", current.getTimestamp()).toString();
         holder.time.setText(dateString);
 
+        // Fix M7: Reset text color to default before the switch to prevent recycle bugs
+        holder.type.setTextColor(0xFF212121);
+
         // Color based on type
         switch (current.getType()) {
             case "ADD":

@@ -36,16 +36,25 @@ public class DashboardActivity extends AppCompatActivity {
 
         viewModel = new ViewModelProvider(this).get(ItemViewModel.class);
         initUI();
+        setupDashboardStreams();
 
         viewModel.getUserProfile(uid).observe(this, user -> {
             if (user != null) {
                 this.warehouseId = user.getEmployerId();
-                observeStatsAndLogs();
+                viewModel.setWarehouseContext(warehouseId);
+                observeStats();
             }
         });
     }
 
-    private void observeStatsAndLogs() {
+    private void setupDashboardStreams() {
+        // Observe reactive stream for transactions (includes search logic)
+        viewModel.getDashboardSearchStream().observe(this, logs -> {
+            if (logs != null) adapter.setTransactions(logs);
+        });
+    }
+
+    private void observeStats() {
         if (warehouseId == null) return;
 
         viewModel.getTotalItemsCount(warehouseId).observe(this, count -> 
@@ -53,10 +62,6 @@ public class DashboardActivity extends AppCompatActivity {
 
         viewModel.getTotalInventoryValue(warehouseId).observe(this, value -> 
                 textTotalValue.setText(String.format(Locale.getDefault(), "₪%.2f", value != null ? value : 0.0)));
-
-        viewModel.getTransactions(warehouseId).observe(this, logs -> {
-            if (logs != null) adapter.setTransactions(logs);
-        });
     }
 
     private void initUI() {
@@ -74,15 +79,10 @@ public class DashboardActivity extends AppCompatActivity {
         editSearch.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                if (warehouseId == null) return;
                 String q = s.toString();
-                if (q.isEmpty()) observeStatsAndLogs();
-                else viewModel.searchTransactions(warehouseId, q).observe(DashboardActivity.this, logs -> {
-                    if (logs != null) {
-                        adapter.setTransactions(logs);
-                        textFilterStatus.setText("חיפוש: " + q);
-                    }
-                });
+                viewModel.setDashboardSearchQuery(q);
+                if (!q.isEmpty()) textFilterStatus.setText("חיפוש: " + q);
+                else textFilterStatus.setText("מציג את כל הפעילויות");
             }
             @Override public void afterTextChanged(Editable s) {}
         });
@@ -104,7 +104,7 @@ public class DashboardActivity extends AppCompatActivity {
         buttonClear.setOnClickListener(v -> {
             editSearch.setText("");
             textFilterStatus.setText("מציג את כל הפעילויות");
-            observeStatsAndLogs();
+            viewModel.setDashboardSearchQuery("");
         });
     }
 }

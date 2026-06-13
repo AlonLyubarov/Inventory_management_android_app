@@ -83,7 +83,6 @@ public class ManageUsersActivity extends AppCompatActivity {
     }
 
     private void linkWorkerByEmail(String workerEmail) {
-        // Standardize email to lowercase to prevent matching issues
         String searchEmail = workerEmail.toLowerCase().trim();
         
         mFirestore.collection("users")
@@ -95,15 +94,11 @@ public class ManageUsersActivity extends AppCompatActivity {
                         return;
                     }
                     for (QueryDocumentSnapshot doc : snapshots) {
-                        User worker = doc.toObject(User.class);
-                        // Safety: ensure UID is set from doc ID if missing
-                        if (worker.getUserId() == null) worker.setUserId(doc.getId());
-                        
-                        worker.setEmployerId(currentManagerId); 
-                        
-                        mFirestore.collection("users").document(worker.getUserId()).set(worker)
+                        // Fix M2: Selective update instead of set() to avoid overwriting unrelated fields
+                        mFirestore.collection("users").document(doc.getId())
+                                .update("employerId", currentManagerId)
                                 .addOnSuccessListener(aVoid -> {
-                                    Toast.makeText(this, "העובד " + worker.getDisplayName() + " צורף לצוות שלך", Toast.LENGTH_SHORT).show();
+                                    Toast.makeText(this, "העובד צורף לצוות שלך", Toast.LENGTH_SHORT).show();
                                 })
                                 .addOnFailureListener(err -> {
                                     Toast.makeText(this, "שגיאה בחיבור העובד", Toast.LENGTH_SHORT).show();
@@ -113,8 +108,9 @@ public class ManageUsersActivity extends AppCompatActivity {
     }
 
     private void updateUserRole(User user, String newRole) {
-        user.setRole(newRole);
-        mFirestore.collection("users").document(user.getUserId()).set(user)
+        // Fix M2: Selective update for role
+        mFirestore.collection("users").document(user.getUserId())
+                .update("role", newRole)
                 .addOnSuccessListener(aVoid -> Toast.makeText(this, "הרשאה עודכנה", Toast.LENGTH_SHORT).show());
     }
 }

@@ -8,7 +8,7 @@ import androidx.room.RoomDatabase;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-@Database(entities = {Item.class, User.class, Transaction.class, ProductTemplate.class}, version = 17, exportSchema = false)
+@Database(entities = {Item.class, User.class, Transaction.class, ProductTemplate.class}, version = 18, exportSchema = false)
 public abstract class AppDatabase extends RoomDatabase {
 
     public abstract ItemDao itemDao();

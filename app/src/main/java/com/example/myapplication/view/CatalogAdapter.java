@@ -6,6 +6,7 @@ import android.view.ViewGroup;
 import android.widget.ImageButton;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.myapplication.R;
@@ -38,37 +39,51 @@ public class CatalogAdapter extends RecyclerView.Adapter<CatalogAdapter.CatalogH
     @Override
     public void onBindViewHolder(@NonNull CatalogHolder holder, int position) {
         ProductTemplate current = templates.get(position);
-        holder.name.setText(current.getName());
-        holder.sku.setText("מק''ט: " + current.getSku());
-        holder.price.setText(String.format(Locale.getDefault(), "₪%.2f", current.getDefaultPrice()));
+        holder.textName.setText(current.getName());
+        holder.textSku.setText("מק''ט: " + current.getSku());
+        holder.textPrice.setText(String.format(Locale.getDefault(), "₪%.2f", current.getDefaultPrice()));
 
-        holder.delete.setOnClickListener(v -> {
-            if (listener != null) {
-                listener.onDeleteClick(current);
-            }
+        holder.btnDelete.setOnClickListener(v -> {
+            if (listener != null) listener.onDeleteClick(current);
         });
     }
 
     @Override
-    public int getItemCount() {
-        return templates.size();
-    }
+    public int getItemCount() { return templates.size(); }
 
-    public void setTemplates(List<ProductTemplate> templates) {
-        this.templates = templates;
-        notifyDataSetChanged();
+    public void setTemplates(List<ProductTemplate> newTemplates) {
+        DiffUtil.DiffResult diffResult = DiffUtil.calculateDiff(new DiffUtil.Callback() {
+            @Override
+            public int getOldListSize() { return templates.size(); }
+            @Override
+            public int getNewListSize() { return newTemplates.size(); }
+            @Override
+            public boolean areItemsTheSame(int oldItemPosition, int newItemPosition) {
+                return templates.get(oldItemPosition).getId() == newTemplates.get(newItemPosition).getId();
+            }
+            @Override
+            public boolean areContentsTheSame(int oldItemPosition, int newItemPosition) {
+                ProductTemplate oldT = templates.get(oldItemPosition);
+                ProductTemplate newT = newTemplates.get(newItemPosition);
+                return oldT.getName().equals(newT.getName()) && 
+                       oldT.getSku().equals(newT.getSku()) && 
+                       oldT.getDefaultPrice() == newT.getDefaultPrice();
+            }
+        });
+        this.templates = new ArrayList<>(newTemplates);
+        diffResult.dispatchUpdatesTo(this);
     }
 
     static class CatalogHolder extends RecyclerView.ViewHolder {
-        private final TextView name, sku, price;
-        private final ImageButton delete;
+        TextView textName, textSku, textPrice;
+        ImageButton btnDelete;
 
         public CatalogHolder(@NonNull View itemView) {
             super(itemView);
-            name = itemView.findViewById(R.id.text_catalog_name);
-            sku = itemView.findViewById(R.id.text_catalog_sku);
-            price = itemView.findViewById(R.id.text_catalog_price);
-            delete = itemView.findViewById(R.id.button_delete_catalog);
+            textName = itemView.findViewById(R.id.text_catalog_name);
+            textSku = itemView.findViewById(R.id.text_catalog_sku);
+            textPrice = itemView.findViewById(R.id.text_catalog_price);
+            btnDelete = itemView.findViewById(R.id.button_delete_catalog);
         }
     }
 }

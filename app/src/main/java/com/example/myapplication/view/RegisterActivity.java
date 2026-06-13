@@ -98,6 +98,10 @@ public class RegisterActivity extends AppCompatActivity {
                     intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                     startActivity(intent);
                     finish();
+                })
+                .addOnFailureListener(e -> {
+                    // Fix C5: Error handling for failed profile creation
+                    Toast.makeText(this, "שגיאה ביצירת הפרופיל: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 });
     }
 

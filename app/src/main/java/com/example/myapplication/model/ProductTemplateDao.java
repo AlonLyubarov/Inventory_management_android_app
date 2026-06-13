@@ -18,6 +18,9 @@ public interface ProductTemplateDao {
     @Delete
     void delete(ProductTemplate template);
 
+    @Query("DELETE FROM product_templates_table WHERE firestoreId = :fid")
+    void deleteByFirestoreId(String fid);
+
     @Query("SELECT * FROM product_templates_table WHERE ownerId = :userId ORDER BY name ASC")
     LiveData<List<ProductTemplate>> getAllTemplates(String userId);
 
