@@ -14,7 +14,7 @@ import java.util.List;
 
 /**
  * High-Performance Reactive Repository.
- * Uses Delta-Sync to prevent UI jumping and lags.
+ * Logic: Cloud <-> Room (Single Source of Truth) <-> UI
  */
 public class ItemRepository {
 
@@ -24,13 +24,11 @@ public class ItemRepository {
     private final UserDao mUserDao;
     private final FirebaseFirestore mFirestore;
     private final AppDatabase mDb;
-    private final Application mApplication;
 
     private ListenerRegistration inventoryListener, templateListener, transactionListener, userListener;
     private String currentWarehouseId;
 
     public ItemRepository(Application application) {
-        this.mApplication = application;
         this.mDb = AppDatabase.getDatabase(application);
         this.mItemDao = mDb.itemDao();
         this.mTransactionDao = mDb.transactionDao();
@@ -57,14 +55,12 @@ public class ItemRepository {
 
     private synchronized void setupWarehouseListeners(String warehouseId) {
         if (warehouseId == null || "PENDING".equals(warehouseId)) return;
-        
-        // Prevent duplicate listener creation
         if (warehouseId.equals(currentWarehouseId)) return;
         currentWarehouseId = warehouseId;
 
-        Log.d("Sync", "Setting up listeners for warehouse: " + warehouseId);
+        Log.d("Sync", "Attaching warehouse listeners: " + warehouseId);
 
-        // 1. SMART INVENTORY SYNC
+        // 1. SMART INVENTORY SYNC (Uses smartUpsert to avoid flickering)
         if (inventoryListener != null) inventoryListener.remove();
         inventoryListener = mFirestore.collection("items")
                 .whereEqualTo("ownerId", warehouseId)
@@ -73,22 +69,19 @@ public class ItemRepository {
                         AppDatabase.databaseWriteExecutor.execute(() -> {
                             for (DocumentChange dc : snapshots.getDocumentChanges()) {
                                 Item item = dc.getDocument().toObject(Item.class);
+                                if (item == null) continue;
                                 item.setFirestoreId(dc.getDocument().getId());
-                                switch (dc.getType()) {
-                                    case ADDED:
-                                    case MODIFIED:
-                                        mItemDao.upsert(item);
-                                        break;
-                                    case REMOVED:
-                                        mItemDao.delete(item);
-                                        break;
+                                if (dc.getType() == DocumentChange.Type.REMOVED) {
+                                    mItemDao.delete(item);
+                                } else {
+                                    mItemDao.smartUpsert(item);
                                 }
                             }
                         });
                     }
                 });
 
-        // 2. SMART TEMPLATES SYNC
+        // 2. TEMPLATES SYNC
         if (templateListener != null) templateListener.remove();
         templateListener = mFirestore.collection("product_templates")
                 .whereEqualTo("ownerId", warehouseId)
@@ -97,15 +90,16 @@ public class ItemRepository {
                         AppDatabase.databaseWriteExecutor.execute(() -> {
                             for (DocumentChange dc : snapshots.getDocumentChanges()) {
                                 ProductTemplate t = dc.getDocument().toObject(ProductTemplate.class);
+                                if (t == null) continue;
                                 t.setFirestoreId(dc.getDocument().getId());
-                                if (dc.getType() != DocumentChange.Type.REMOVED) mTemplateDao.upsert(t);
-                                else mTemplateDao.delete(t);
+                                if (dc.getType() == DocumentChange.Type.REMOVED) mTemplateDao.delete(t);
+                                else mTemplateDao.upsert(t);
                             }
                         });
                     }
                 });
 
-        // 3. SMART TRANSACTIONS SYNC
+        // 3. TRANSACTIONS SYNC
         if (transactionListener != null) transactionListener.remove();
         transactionListener = mFirestore.collection("transactions")
                 .whereEqualTo("ownerId", warehouseId)
@@ -114,6 +108,7 @@ public class ItemRepository {
                         AppDatabase.databaseWriteExecutor.execute(() -> {
                             for (DocumentChange dc : snapshots.getDocumentChanges()) {
                                 Transaction t = dc.getDocument().toObject(Transaction.class);
+                                if (t == null) continue;
                                 t.setFirestoreId(dc.getDocument().getId());
                                 if (dc.getType() == DocumentChange.Type.ADDED) mTransactionDao.insert(t);
                             }
@@ -151,6 +146,7 @@ public class ItemRepository {
                 mFirestore.collection("items").document(id).set(item);
                 recordTransaction("ADD", item, item.getQuantity());
             }
+            // Auto-template
             ProductTemplate pt = new ProductTemplate(item.getName(), item.getSku(), item.getPrice(), item.getOwnerId(), item.getBrand());
             pt.setLowStockThreshold(item.getLowStockThreshold());
             upsertTemplate(pt);
@@ -201,41 +197,30 @@ public class ItemRepository {
         if (templateListener != null) templateListener.remove();
         if (transactionListener != null) transactionListener.remove();
         currentWarehouseId = null;
-
-        AppDatabase.databaseWriteExecutor.execute(() -> {
-            FirebaseAuth.getInstance().signOut();
-            if (onComplete != null) onComplete.run();
-        });
+        FirebaseAuth.getInstance().signOut();
+        if (onComplete != null) onComplete.run();
     }
 
     public void logoutAndReset(Runnable onComplete) {
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) {
-            logoutOnly(onComplete);
-            return;
-        }
-
+        if (user == null) { logoutOnly(onComplete); return; }
         String uid = user.getUid();
-        // 1. Delete Firestore profile
-        mFirestore.collection("users").document(uid).delete()
-            .addOnCompleteListener(firestoreTask -> {
-                // 2. Delete the Authentication account
-                user.delete().addOnCompleteListener(authTask -> {
-                    // 3. Wipe local DB and finish
-                    AppDatabase.databaseWriteExecutor.execute(() -> {
-                        try {
-                            if (userListener != null) userListener.remove();
-                            if (inventoryListener != null) inventoryListener.remove();
-                            if (templateListener != null) templateListener.remove();
-                            if (transactionListener != null) transactionListener.remove();
-                            currentWarehouseId = null;
-                            mDb.clearAllTables();
-                            FirebaseAuth.getInstance().signOut();
-                            if (onComplete != null) onComplete.run();
-                        } catch (Exception ignored) {}
-                    });
+        mFirestore.collection("users").document(uid).delete().addOnCompleteListener(task -> {
+            user.delete().addOnCompleteListener(authTask -> {
+                AppDatabase.databaseWriteExecutor.execute(() -> {
+                    try {
+                        if (userListener != null) userListener.remove();
+                        if (inventoryListener != null) inventoryListener.remove();
+                        if (templateListener != null) templateListener.remove();
+                        if (transactionListener != null) transactionListener.remove();
+                        currentWarehouseId = null;
+                        mDb.clearAllTables();
+                        FirebaseAuth.getInstance().signOut();
+                        if (onComplete != null) onComplete.run();
+                    } catch (Exception ignored) {}
                 });
             });
+        });
     }
 
     public LiveData<List<Item>> searchDatabase(String warehouseId, String q) { return mItemDao.searchDatabase(warehouseId, "%" + q + "%"); }

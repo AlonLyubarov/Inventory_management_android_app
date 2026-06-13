@@ -27,6 +27,7 @@
         android:background="@drawable/quantity_background"
         android:paddingHorizontal="16dp"
         android:textColor="@android:color/black"
+        android:textColorHint="#616161"
         android:layout_marginBottom="16dp" />
 
     <!-- Password Field - Clean Box -->
@@ -39,6 +40,7 @@
         android:background="@drawable/quantity_background"
         android:paddingHorizontal="16dp"
         android:textColor="@android:color/black"
+        android:textColorHint="#616161"
         android:layout_marginBottom="24dp" />
 
     <com.google.android.material.button.MaterialButton

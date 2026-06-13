@@ -13,14 +13,25 @@ import java.util.List;
 @Dao
 public interface ItemDao {
 
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     void insert(Item item);
 
     @Update
     void update(Item item);
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    void upsert(Item item);
+    /**
+     * Custom upsert logic to prevent unnecessary DELETE+INSERT cycles 
+     * which cause UI flickering in reactive streams.
+     */
+    default void smartUpsert(Item item) {
+        long id = insertWithIdReturn(item);
+        if (id == -1) {
+            update(item);
+        }
+    }
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    long insertWithIdReturn(Item item);
 
     @Delete
     void delete(Item item);

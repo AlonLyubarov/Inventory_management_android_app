@@ -6,7 +6,6 @@ import android.graphics.Paint;
 import android.graphics.pdf.PdfDocument;
 import android.net.Uri;
 import android.os.Bundle;
-import android.widget.Button;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
@@ -78,7 +77,7 @@ public class ReportsActivity extends AppCompatActivity {
 
     private void exportTransactions(boolean isCsv) {
         if (warehouseId == null || selectedStartDate == 0) return;
-        viewModel.getTransactionsByDateRange(warehouseId, selectedStartDate, selectedEndDate).observe(this, logs -> {
+        viewModel.getTransactionsRange(warehouseId, selectedStartDate, selectedEndDate).observe(this, logs -> {
             if (logs == null || logs.isEmpty()) return;
             if (isCsv) generateTransactionsCsv(logs);
             else generateTransactionsPdf(logs);
@@ -91,7 +90,7 @@ public class ReportsActivity extends AppCompatActivity {
             csv.append(String.format(Locale.getDefault(), "%s,%s,%d,%.2f,%.2f\n",
                     item.getName(), item.getSku(), item.getQuantity(), item.getPrice(), item.getQuantity() * item.getPrice()));
         }
-        shareFile("Inventory", csv.toString(), "text/csv", ".csv");
+        shareFile("Inventory", csv.toString(), ".csv");
     }
 
     private void generateTransactionsCsv(List<Transaction> logs) {
@@ -100,7 +99,7 @@ public class ReportsActivity extends AppCompatActivity {
             csv.append(String.format(Locale.getDefault(), "%s,%s,%s,%d,%.2f\n",
                     displayDateFormat.format(new Date(log.getTimestamp())), log.getType(), log.getItemName(), log.getQuantityChanged(), log.getAmountChanged()));
         }
-        shareFile("Transactions", csv.toString(), "text/csv", ".csv");
+        shareFile("Transactions", csv.toString(), ".csv");
     }
 
     private void generateInventoryPdf(List<Item> items) {
@@ -141,11 +140,11 @@ public class ReportsActivity extends AppCompatActivity {
         sharePdf(doc, "Transactions");
     }
 
-    private void shareFile(String prefix, String data, String mime, String ext) {
+    private void shareFile(String prefix, String data, String ext) {
         File file = new File(getCacheDir(), prefix + "_" + fileDateFormat.format(new Date()) + ext);
         try (FileOutputStream out = new FileOutputStream(file)) {
             out.write(data.getBytes(StandardCharsets.UTF_8));
-            triggerShare(file, mime);
+            triggerShare(file, "text/csv");
         } catch (IOException ignored) {}
     }
 

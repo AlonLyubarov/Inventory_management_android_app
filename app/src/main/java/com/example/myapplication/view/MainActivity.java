@@ -48,40 +48,43 @@ public class MainActivity extends AppCompatActivity {
 
         viewModel = new ViewModelProvider(this).get(ItemViewModel.class);
         initUI();
+        setupStableStreams();
 
-        // Start reactive sync
+        // 1. Trigger cloud synchronization
         viewModel.startSync(uid);
 
-        // REACTIVE: Listen to Profile changes
+        // 2. Observe User Profile to determine active warehouse
         viewModel.getUserProfile(uid).observe(this, user -> {
             this.currentUser = user;
             if (user != null) {
                 invalidateOptionsMenu();
-                setupInventoryStream(user.getEmployerId());
+                String warehouseId = user.getEmployerId();
+                
+                // Update UI based on approval status
+                if ("PENDING".equals(warehouseId)) {
+                    buttonAdd.setEnabled(false);
+                    buttonAdd.setText("ממתין לאישור...");
+                } else {
+                    buttonAdd.setEnabled(true);
+                    buttonAdd.setText("הוסף למלאי");
+                }
+                
+                // Set context in ViewModel - this triggers the stable inventory streams
+                viewModel.setWarehouseContext(warehouseId);
             }
         });
     }
 
-    private void setupInventoryStream(String warehouseId) {
-        if (warehouseId == null || "PENDING".equals(warehouseId)) {
-            buttonAdd.setEnabled(false);
-            buttonAdd.setText("ממתין לאישור...");
-            adapter.setItems(new ArrayList<>());
-            return;
-        }
-
-        buttonAdd.setEnabled(true);
-        buttonAdd.setText("הוסף למלאי");
-
-        // Reactively observe inventory list
-        viewModel.getInventory(warehouseId).observe(this, items -> {
+    private void setupStableStreams() {
+        // Observe Inventory: Stable stream, no duplicate observers added
+        viewModel.getInventoryStream().observe(this, items -> {
             if (items != null) {
                 adapter.setItems(items);
             }
         });
 
-        // Reactively observe templates for autocomplete
-        viewModel.getTemplates(warehouseId).observe(this, templates -> {
+        // Observe Templates for Autocomplete
+        viewModel.getTemplateStream().observe(this, templates -> {
             if (templates != null) {
                 ArrayAdapter<ProductTemplate> autocompAdapter = new ArrayAdapter<>(
                         this, android.R.layout.simple_dropdown_item_1line, templates);
@@ -107,7 +110,6 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onQuantityChange(Item item, int newQuantity) {
                 int old = item.getQuantity();
-                // Create a shallow copy to ensure DiffUtil detects the change
                 Item updated = new Item(item.getName(), item.getPrice(), newQuantity, item.getOwnerId(), item.getSku(), item.getBrand());
                 updated.setId(item.getId());
                 updated.setFirestoreId(item.getFirestoreId());

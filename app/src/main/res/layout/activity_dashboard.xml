@@ -52,11 +52,10 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="סה''כ פריטים"
-                    android:textSize="12sp"
-                    android:textColor="#757575"/>
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="#424242"/>
             </LinearLayout>
-
-            <!-- Line removed as requested -->
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -78,8 +77,9 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="שווי המלאי"
-                    android:textSize="12sp"
-                    android:textColor="#757575"/>
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="#424242"/>
             </LinearLayout>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
@@ -93,6 +93,7 @@
         android:background="@drawable/quantity_background"
         android:paddingHorizontal="16dp"
         android:textColor="@android:color/black"
+        android:textColorHint="#616161"
         android:layout_marginBottom="12dp"
         android:inputType="text" />
 

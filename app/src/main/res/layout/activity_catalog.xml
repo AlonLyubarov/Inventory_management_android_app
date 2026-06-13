@@ -47,6 +47,7 @@
                 android:background="@drawable/quantity_background"
                 android:paddingHorizontal="16dp"
                 android:textColor="@android:color/black"
+                android:textColorHint="#666666"
                 android:layout_marginBottom="12dp"
                 android:inputType="text" />
 
@@ -64,6 +65,7 @@
                     android:background="@drawable/quantity_background"
                     android:paddingHorizontal="16dp"
                     android:textColor="@android:color/black"
+                    android:textColorHint="#666666"
                     android:inputType="text" />
 
                 <View
@@ -79,6 +81,7 @@
                     android:background="@drawable/quantity_background"
                     android:paddingHorizontal="16dp"
                     android:textColor="@android:color/black"
+                    android:textColorHint="#666666"
                     android:inputType="text" />
             </LinearLayout>
 
@@ -97,7 +100,8 @@
                     android:inputType="numberDecimal"
                     android:background="@drawable/quantity_background"
                     android:paddingHorizontal="16dp"
-                    android:textColor="@android:color/black" />
+                    android:textColor="@android:color/black"
+                    android:textColorHint="#666666" />
 
                 <View
                     android:layout_width="12dp"
@@ -112,7 +116,8 @@
                     android:inputType="number"
                     android:background="@drawable/quantity_background"
                     android:paddingHorizontal="16dp"
-                    android:textColor="@android:color/black" />
+                    android:textColor="@android:color/black"
+                    android:textColorHint="#666666" />
             </LinearLayout>
 
             <com.google.android.material.button.MaterialButton

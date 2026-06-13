@@ -54,7 +54,7 @@ public class DashboardActivity extends AppCompatActivity {
         viewModel.getTotalInventoryValue(warehouseId).observe(this, value -> 
                 textTotalValue.setText(String.format(Locale.getDefault(), "₪%.2f", value != null ? value : 0.0)));
 
-        viewModel.getAllTransactions(warehouseId).observe(this, logs -> {
+        viewModel.getTransactions(warehouseId).observe(this, logs -> {
             if (logs != null) adapter.setTransactions(logs);
         });
     }
@@ -92,7 +92,7 @@ public class DashboardActivity extends AppCompatActivity {
             picker.show(getSupportFragmentManager(), "date_picker");
             picker.addOnPositiveButtonClickListener(sel -> {
                 if (warehouseId == null) return;
-                viewModel.getTransactionsByDateRange(warehouseId, sel.first, sel.second + 86400000).observe(this, logs -> {
+                viewModel.getTransactionsRange(warehouseId, sel.first, sel.second + 86400000).observe(this, logs -> {
                     if (logs != null) {
                         adapter.setTransactions(logs);
                         textFilterStatus.setText("מציג טווח תאריכים נבחר");

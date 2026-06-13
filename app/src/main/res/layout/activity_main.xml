@@ -24,7 +24,7 @@
         android:orientation="vertical"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-        <!-- Form Section with Clean Boxes -->
+        <!-- Input Form Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -47,7 +47,7 @@
                     android:textColor="#1A237E"
                     android:layout_marginBottom="12dp" />
 
-                <!-- Label Inside Box (using hint in a styled EditText) -->
+                <!-- Simple Clean Boxes with Labels Inside -->
                 <AutoCompleteTextView
                     android:id="@+id/edit_text_name"
                     android:layout_width="match_parent"
@@ -56,6 +56,7 @@
                     android:background="@drawable/quantity_background"
                     android:paddingHorizontal="16dp"
                     android:textColor="@android:color/black"
+                    android:textColorHint="#616161"
                     android:layout_marginBottom="12dp"
                     android:inputType="text" />
 
@@ -73,6 +74,7 @@
                         android:background="@drawable/quantity_background"
                         android:paddingHorizontal="16dp"
                         android:textColor="@android:color/black"
+                        android:textColorHint="#616161"
                         android:inputType="text" />
 
                     <View android:layout_width="8dp" android:layout_height="match_parent"/>
@@ -86,6 +88,7 @@
                         android:background="@drawable/quantity_background"
                         android:paddingHorizontal="16dp"
                         android:textColor="@android:color/black"
+                        android:textColorHint="#616161"
                         android:inputType="text" />
                 </LinearLayout>
 
@@ -104,7 +107,8 @@
                         android:inputType="number"
                         android:background="@drawable/quantity_background"
                         android:paddingHorizontal="16dp"
-                        android:textColor="@android:color/black" />
+                        android:textColor="@android:color/black"
+                        android:textColorHint="#616161" />
 
                     <View android:layout_width="8dp" android:layout_height="match_parent"/>
 
@@ -117,7 +121,8 @@
                         android:inputType="numberDecimal"
                         android:background="@drawable/quantity_background"
                         android:paddingHorizontal="16dp"
-                        android:textColor="@android:color/black" />
+                        android:textColor="@android:color/black"
+                        android:textColorHint="#616161" />
                 </LinearLayout>
 
                 <com.google.android.material.button.MaterialButton
