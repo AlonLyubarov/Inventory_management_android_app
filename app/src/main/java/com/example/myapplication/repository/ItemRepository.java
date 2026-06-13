@@ -1,9 +1,11 @@
 package com.example.myapplication.repository;
 
 import android.app.Application;
+import android.util.Log;
 import androidx.lifecycle.LiveData;
 import com.example.myapplication.model.*;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentChange;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
@@ -25,6 +27,7 @@ public class ItemRepository {
     private final Application mApplication;
 
     private ListenerRegistration inventoryListener, templateListener, transactionListener, userListener;
+    private String currentWarehouseId;
 
     public ItemRepository(Application application) {
         this.mApplication = application;
@@ -52,10 +55,16 @@ public class ItemRepository {
                 });
     }
 
-    private void setupWarehouseListeners(String warehouseId) {
+    private synchronized void setupWarehouseListeners(String warehouseId) {
         if (warehouseId == null || "PENDING".equals(warehouseId)) return;
+        
+        // Prevent duplicate listener creation
+        if (warehouseId.equals(currentWarehouseId)) return;
+        currentWarehouseId = warehouseId;
 
-        // 1. SMART INVENTORY SYNC (Delta changes only)
+        Log.d("Sync", "Setting up listeners for warehouse: " + warehouseId);
+
+        // 1. SMART INVENTORY SYNC
         if (inventoryListener != null) inventoryListener.remove();
         inventoryListener = mFirestore.collection("items")
                 .whereEqualTo("ownerId", warehouseId)
@@ -186,18 +195,47 @@ public class ItemRepository {
         });
     }
 
-    public void logoutAndReset(Runnable onComplete) {
+    public void logoutOnly(Runnable onComplete) {
+        if (userListener != null) userListener.remove();
+        if (inventoryListener != null) inventoryListener.remove();
+        if (templateListener != null) templateListener.remove();
+        if (transactionListener != null) transactionListener.remove();
+        currentWarehouseId = null;
+
         AppDatabase.databaseWriteExecutor.execute(() -> {
-            try {
-                if (userListener != null) userListener.remove();
-                if (inventoryListener != null) inventoryListener.remove();
-                if (templateListener != null) templateListener.remove();
-                if (transactionListener != null) transactionListener.remove();
-                mDb.clearAllTables();
-                FirebaseAuth.getInstance().signOut();
-                if (onComplete != null) onComplete.run();
-            } catch (Exception ignored) {}
+            FirebaseAuth.getInstance().signOut();
+            if (onComplete != null) onComplete.run();
         });
+    }
+
+    public void logoutAndReset(Runnable onComplete) {
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user == null) {
+            logoutOnly(onComplete);
+            return;
+        }
+
+        String uid = user.getUid();
+        // 1. Delete Firestore profile
+        mFirestore.collection("users").document(uid).delete()
+            .addOnCompleteListener(firestoreTask -> {
+                // 2. Delete the Authentication account
+                user.delete().addOnCompleteListener(authTask -> {
+                    // 3. Wipe local DB and finish
+                    AppDatabase.databaseWriteExecutor.execute(() -> {
+                        try {
+                            if (userListener != null) userListener.remove();
+                            if (inventoryListener != null) inventoryListener.remove();
+                            if (templateListener != null) templateListener.remove();
+                            if (transactionListener != null) transactionListener.remove();
+                            currentWarehouseId = null;
+                            mDb.clearAllTables();
+                            FirebaseAuth.getInstance().signOut();
+                            if (onComplete != null) onComplete.run();
+                        } catch (Exception ignored) {}
+                    });
+                });
+            });
     }
 
     public LiveData<List<Item>> searchDatabase(String warehouseId, String q) { return mItemDao.searchDatabase(warehouseId, "%" + q + "%"); }

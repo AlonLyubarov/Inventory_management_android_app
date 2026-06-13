@@ -56,6 +56,8 @@
                     android:textColor="#757575"/>
             </LinearLayout>
 
+            <!-- Line removed as requested -->
+
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -82,21 +84,17 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- Search and Filter -->
-    <com.google.android.material.textfield.TextInputLayout
+    <!-- Search box - Clean Box Style -->
+    <EditText
+        android:id="@+id/edit_search_dashboard"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="50dp"
         android:hint="חפש בהיסטוריית פעולות..."
-        app:startIconDrawable="@android:drawable/ic_menu_search"
-        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-        android:layout_marginBottom="12dp">
-
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/edit_search_dashboard"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:inputType="text" />
-    </com.google.android.material.textfield.TextInputLayout>
+        android:background="@drawable/quantity_background"
+        android:paddingHorizontal="16dp"
+        android:textColor="@android:color/black"
+        android:layout_marginBottom="12dp"
+        android:inputType="text" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -113,7 +111,6 @@
             android:layout_weight="1"
             android:text="בחר טווח תאריכים"
             app:cornerRadius="8dp"
-            app:icon="@android:drawable/ic_menu_my_calendar"
             android:textAllCaps="false" />
 
         <ImageButton
@@ -124,7 +121,7 @@
             android:src="@android:drawable/ic_menu_close_clear_cancel"
             android:background="?attr/selectableItemBackgroundBorderless"
             app:tint="#757575"
-            android:contentDescription="נקה סינון" />
+            android:contentDescription="נקה" />
     </LinearLayout>
 
     <TextView

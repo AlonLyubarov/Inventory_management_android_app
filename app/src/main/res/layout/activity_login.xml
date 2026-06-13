@@ -17,51 +17,29 @@
         android:layout_marginBottom="40dp"
         android:textColor="#1A237E" />
 
-    <!-- Email Field -->
-    <com.google.android.material.textfield.TextInputLayout
+    <!-- Email Field - Clean Box -->
+    <EditText
+        android:id="@+id/edit_text_email"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="55dp"
         android:hint="כתובת אימייל"
-        android:layout_marginBottom="16dp"
-        app:startIconDrawable="@android:drawable/ic_dialog_email"
-        app:startIconTint="#1A237E"
-        style="@style/Widget.MaterialComponents.TextInputLayout.FilledBox"
-        app:boxBackgroundColor="#F1F3F4"
-        app:boxCornerRadiusTopStart="12dp"
-        app:boxCornerRadiusTopEnd="12dp">
+        android:inputType="textEmailAddress"
+        android:background="@drawable/quantity_background"
+        android:paddingHorizontal="16dp"
+        android:textColor="@android:color/black"
+        android:layout_marginBottom="16dp" />
 
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/edit_text_email"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:inputType="textEmailAddress"
-            android:background="@android:color/transparent"
-            android:textColor="@android:color/black" />
-    </com.google.android.material.textfield.TextInputLayout>
-
-    <!-- Password Field -->
-    <com.google.android.material.textfield.TextInputLayout
+    <!-- Password Field - Clean Box -->
+    <EditText
+        android:id="@+id/edit_text_password"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="55dp"
         android:hint="סיסמה"
-        android:layout_marginBottom="24dp"
-        app:passwordToggleEnabled="true"
-        app:passwordToggleTint="#1A237E"
-        app:startIconDrawable="@android:drawable/ic_lock_idle_lock"
-        app:startIconTint="#1A237E"
-        style="@style/Widget.MaterialComponents.TextInputLayout.FilledBox"
-        app:boxBackgroundColor="#F1F3F4"
-        app:boxCornerRadiusTopStart="12dp"
-        app:boxCornerRadiusTopEnd="12dp">
-
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/edit_text_password"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:inputType="textPassword"
-            android:background="@android:color/transparent"
-            android:textColor="@android:color/black" />
-    </com.google.android.material.textfield.TextInputLayout>
+        android:inputType="textPassword"
+        android:background="@drawable/quantity_background"
+        android:paddingHorizontal="16dp"
+        android:textColor="@android:color/black"
+        android:layout_marginBottom="24dp" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/button_login"

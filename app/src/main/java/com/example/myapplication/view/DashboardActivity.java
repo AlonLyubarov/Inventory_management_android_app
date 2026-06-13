@@ -54,7 +54,7 @@ public class DashboardActivity extends AppCompatActivity {
         viewModel.getTotalInventoryValue(warehouseId).observe(this, value -> 
                 textTotalValue.setText(String.format(Locale.getDefault(), "₪%.2f", value != null ? value : 0.0)));
 
-        viewModel.getTransactions(warehouseId).observe(this, logs -> {
+        viewModel.getAllTransactions(warehouseId).observe(this, logs -> {
             if (logs != null) adapter.setTransactions(logs);
         });
     }

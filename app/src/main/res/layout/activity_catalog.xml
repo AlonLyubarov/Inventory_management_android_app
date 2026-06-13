@@ -39,68 +39,47 @@
                 android:layout_marginBottom="16dp"
                 android:textColor="#3F51B5"/>
 
-            <com.google.android.material.textfield.TextInputLayout
+            <EditText
+                android:id="@+id/edit_catalog_name"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="50dp"
                 android:hint="שם הפריט בקטלוג"
-                style="@style/Widget.MaterialComponents.TextInputLayout.FilledBox"
-                app:boxBackgroundColor="#F1F3F4"
-                app:boxCornerRadiusTopStart="12dp"
-                app:boxCornerRadiusTopEnd="12dp"
-                android:layout_marginBottom="12dp">
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/edit_catalog_name"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="text"
-                    android:background="@android:color/transparent"
-                    android:textColor="@android:color/black" />
-            </com.google.android.material.textfield.TextInputLayout>
+                android:background="@drawable/quantity_background"
+                android:paddingHorizontal="16dp"
+                android:textColor="@android:color/black"
+                android:layout_marginBottom="12dp"
+                android:inputType="text" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
 
-                <com.google.android.material.textfield.TextInputLayout
+                <EditText
+                    android:id="@+id/edit_catalog_sku"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="50dp"
                     android:layout_weight="1"
                     android:hint="מק''ט"
-                    style="@style/Widget.MaterialComponents.TextInputLayout.FilledBox"
-                    app:boxBackgroundColor="#F1F3F4"
-                    app:boxCornerRadiusTopStart="12dp"
-                    app:boxCornerRadiusTopEnd="12dp">
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/edit_catalog_sku"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="text"
-                        android:background="@android:color/transparent"
-                        android:textColor="@android:color/black" />
-                </com.google.android.material.textfield.TextInputLayout>
+                    android:background="@drawable/quantity_background"
+                    android:paddingHorizontal="16dp"
+                    android:textColor="@android:color/black"
+                    android:inputType="text" />
 
                 <View
                     android:layout_width="12dp"
                     android:layout_height="match_parent" />
 
-                <com.google.android.material.textfield.TextInputLayout
+                <EditText
+                    android:id="@+id/edit_catalog_brand"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="50dp"
                     android:layout_weight="1"
                     android:hint="חברה"
-                    style="@style/Widget.MaterialComponents.TextInputLayout.FilledBox"
-                    app:boxBackgroundColor="#F1F3F4"
-                    app:boxCornerRadiusTopStart="12dp"
-                    app:boxCornerRadiusTopEnd="12dp">
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/edit_catalog_brand"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="text"
-                        android:background="@android:color/transparent"
-                        android:textColor="@android:color/black" />
-                </com.google.android.material.textfield.TextInputLayout>
+                    android:background="@drawable/quantity_background"
+                    android:paddingHorizontal="16dp"
+                    android:textColor="@android:color/black"
+                    android:inputType="text" />
             </LinearLayout>
 
             <LinearLayout
@@ -109,45 +88,31 @@
                 android:orientation="horizontal"
                 android:layout_marginTop="12dp">
 
-                <com.google.android.material.textfield.TextInputLayout
+                <EditText
+                    android:id="@+id/edit_catalog_price"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="50dp"
                     android:layout_weight="1"
                     android:hint="מחיר ברירת מחדל"
-                    style="@style/Widget.MaterialComponents.TextInputLayout.FilledBox"
-                    app:boxBackgroundColor="#F1F3F4"
-                    app:boxCornerRadiusTopStart="12dp"
-                    app:boxCornerRadiusTopEnd="12dp">
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/edit_catalog_price"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="numberDecimal"
-                        android:background="@android:color/transparent"
-                        android:textColor="@android:color/black" />
-                </com.google.android.material.textfield.TextInputLayout>
+                    android:inputType="numberDecimal"
+                    android:background="@drawable/quantity_background"
+                    android:paddingHorizontal="16dp"
+                    android:textColor="@android:color/black" />
 
                 <View
                     android:layout_width="12dp"
                     android:layout_height="match_parent" />
 
-                <com.google.android.material.textfield.TextInputLayout
+                <EditText
+                    android:id="@+id/edit_catalog_threshold"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="50dp"
                     android:layout_weight="1"
                     android:hint="סף התראה"
-                    style="@style/Widget.MaterialComponents.TextInputLayout.FilledBox"
-                    app:boxBackgroundColor="#F1F3F4"
-                    app:boxCornerRadiusTopStart="12dp"
-                    app:boxCornerRadiusTopEnd="12dp">
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/edit_catalog_threshold"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="number"
-                        android:background="@android:color/transparent"
-                        android:textColor="@android:color/black" />
-                </com.google.android.material.textfield.TextInputLayout>
+                    android:inputType="number"
+                    android:background="@drawable/quantity_background"
+                    android:paddingHorizontal="16dp"
+                    android:textColor="@android:color/black" />
             </LinearLayout>
 
             <com.google.android.material.button.MaterialButton

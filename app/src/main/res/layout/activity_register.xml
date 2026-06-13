@@ -23,69 +23,41 @@
             android:layout_marginBottom="32dp"
             android:textColor="#1A237E" />
 
-        <!-- Full Name -->
-        <com.google.android.material.textfield.TextInputLayout
+        <!-- Name Field -->
+        <EditText
+            android:id="@+id/edit_text_display_name"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="שם מלא של העובד"
-            style="@style/Widget.MaterialComponents.TextInputLayout.FilledBox"
-            app:boxBackgroundColor="#F1F3F4"
-            app:boxCornerRadiusTopStart="12dp"
-            app:boxCornerRadiusTopEnd="12dp"
-            android:layout_marginBottom="16dp">
+            android:layout_height="55dp"
+            android:hint="שם מלא"
+            android:inputType="textPersonName"
+            android:background="@drawable/quantity_background"
+            android:paddingHorizontal="16dp"
+            android:textColor="@android:color/black"
+            android:layout_marginBottom="16dp" />
 
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/edit_text_display_name"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="textPersonName"
-                android:background="@android:color/transparent"
-                android:textColor="@android:color/black"
-                android:padding="16dp" />
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- Email -->
-        <com.google.android.material.textfield.TextInputLayout
+        <!-- Email Field -->
+        <EditText
+            android:id="@+id/edit_text_email_reg"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="55dp"
             android:hint="כתובת אימייל"
-            style="@style/Widget.MaterialComponents.TextInputLayout.FilledBox"
-            app:boxBackgroundColor="#F1F3F4"
-            app:boxCornerRadiusTopStart="12dp"
-            app:boxCornerRadiusTopEnd="12dp"
-            android:layout_marginBottom="16dp">
+            android:inputType="textEmailAddress"
+            android:background="@drawable/quantity_background"
+            android:paddingHorizontal="16dp"
+            android:textColor="@android:color/black"
+            android:layout_marginBottom="16dp" />
 
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/edit_text_email_reg"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="textEmailAddress"
-                android:background="@android:color/transparent"
-                android:textColor="@android:color/black"
-                android:padding="16dp" />
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- Password -->
-        <com.google.android.material.textfield.TextInputLayout
+        <!-- Password Field -->
+        <EditText
+            android:id="@+id/edit_text_password_reg"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="55dp"
             android:hint="סיסמה (8+ תווים)"
-            style="@style/Widget.MaterialComponents.TextInputLayout.FilledBox"
-            app:boxBackgroundColor="#F1F3F4"
-            app:boxCornerRadiusTopStart="12dp"
-            app:boxCornerRadiusTopEnd="12dp"
-            android:layout_marginBottom="24dp"
-            app:passwordToggleEnabled="true">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/edit_text_password_reg"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="textPassword"
-                android:background="@android:color/transparent"
-                android:textColor="@android:color/black"
-                android:padding="16dp" />
-        </com.google.android.material.textfield.TextInputLayout>
+            android:inputType="textPassword"
+            android:background="@drawable/quantity_background"
+            android:paddingHorizontal="16dp"
+            android:textColor="@android:color/black"
+            android:layout_marginBottom="24dp" />
 
         <TextView
             android:layout_width="match_parent"
