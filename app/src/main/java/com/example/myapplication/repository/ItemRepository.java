@@ -1,334 +1,209 @@
 package com.example.myapplication.repository;
 
 import android.app.Application;
-import android.util.Log;
 import androidx.lifecycle.LiveData;
-
-import com.example.myapplication.model.AppDatabase;
-import com.example.myapplication.model.Item;
-import com.example.myapplication.model.ItemDao;
-import com.example.myapplication.model.ProductTemplate;
-import com.example.myapplication.model.ProductTemplateDao;
-import com.example.myapplication.model.Transaction;
-import com.example.myapplication.model.TransactionDao;
-import com.example.myapplication.model.User;
-import com.example.myapplication.model.UserDao;
+import com.example.myapplication.model.*;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.DocumentChange;
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.SetOptions;
-import com.google.firebase.firestore.WriteBatch;
-
 import java.util.List;
 
 /**
- * Repository class that handles data operations for Room, Firestore, and Team-based sync.
+ * High-Performance Reactive Repository.
+ * Uses Delta-Sync to prevent UI jumping and lags.
  */
 public class ItemRepository {
 
-    private ItemDao mItemDao;
-    private TransactionDao mTransactionDao;
-    private ProductTemplateDao mTemplateDao;
-    private UserDao mUserDao;
-    private FirebaseFirestore mFirestore;
-    private AppDatabase mDb;
-    private Application mApplication;
-    private static final String COLLECTION_ITEMS = "items";
-    private static final String COLLECTION_TRANSACTIONS = "transactions";
-    private static final String COLLECTION_TEMPLATES = "product_templates";
+    private final ItemDao mItemDao;
+    private final TransactionDao mTransactionDao;
+    private final ProductTemplateDao mTemplateDao;
+    private final UserDao mUserDao;
+    private final FirebaseFirestore mFirestore;
+    private final AppDatabase mDb;
+    private final Application mApplication;
 
-    private User currentUserProfile; 
+    private ListenerRegistration inventoryListener, templateListener, transactionListener, userListener;
 
     public ItemRepository(Application application) {
-        mApplication = application;
-        mDb = AppDatabase.getDatabase(application);
-        mItemDao = mDb.itemDao();
-        mTransactionDao = mDb.transactionDao();
-        mTemplateDao = mDb.productTemplateDao();
-        mUserDao = mDb.userDao();
+        this.mApplication = application;
+        this.mDb = AppDatabase.getDatabase(application);
+        this.mItemDao = mDb.itemDao();
+        this.mTransactionDao = mDb.transactionDao();
+        this.mTemplateDao = mDb.productTemplateDao();
+        this.mUserDao = mDb.userDao();
         mFirestore = FirebaseFirestore.getInstance();
-        
-        loadCurrentUserProfile();
     }
 
-    private void loadCurrentUserProfile() {
-        String uid = FirebaseAuth.getInstance().getUid();
-        if (uid != null) {
-            AppDatabase.databaseWriteExecutor.execute(() -> {
-                currentUserProfile = mUserDao.getUserById(uid);
-            });
-        }
-    }
-
-    public void syncFromCloud(String userId) {
-        mFirestore.collection("users").document(userId).get().addOnSuccessListener(doc -> {
-            if (doc.exists()) {
-                User user = doc.toObject(User.class);
-                if (user != null) {
-                    String warehouseId = user.getEmployerId();
-                    AppDatabase.databaseWriteExecutor.execute(() -> {
-                        mUserDao.insert(user);
-                        currentUserProfile = user;
-                    });
-                    pullInventory(warehouseId);
-                }
-            }
-        });
-    }
-
-    private void pullInventory(String warehouseId) {
-        if (warehouseId == null) return;
-
-        mFirestore.collection(COLLECTION_ITEMS)
-                .whereEqualTo("ownerId", warehouseId)
-                .get()
-                .addOnSuccessListener(snapshots -> {
-                    AppDatabase.databaseWriteExecutor.execute(() -> {
-                        for (QueryDocumentSnapshot doc : snapshots) {
-                            Item item = doc.toObject(Item.class);
-                            item.setFirestoreId(doc.getId());
-                            mItemDao.upsert(item);
+    public void startReactiveSync(String userId) {
+        if (userListener != null) userListener.remove();
+        userListener = mFirestore.collection("users").document(userId)
+                .addSnapshotListener((snapshot, e) -> {
+                    if (snapshot != null && snapshot.exists()) {
+                        User user = snapshot.toObject(User.class);
+                        if (user != null) {
+                            AppDatabase.databaseWriteExecutor.execute(() -> {
+                                mUserDao.insert(user);
+                                setupWarehouseListeners(user.getEmployerId());
+                            });
                         }
-                    });
+                    }
                 });
+    }
 
-        mFirestore.collection(COLLECTION_TEMPLATES)
+    private void setupWarehouseListeners(String warehouseId) {
+        if (warehouseId == null || "PENDING".equals(warehouseId)) return;
+
+        // 1. SMART INVENTORY SYNC (Delta changes only)
+        if (inventoryListener != null) inventoryListener.remove();
+        inventoryListener = mFirestore.collection("items")
                 .whereEqualTo("ownerId", warehouseId)
-                .get()
-                .addOnSuccessListener(snapshots -> {
-                    AppDatabase.databaseWriteExecutor.execute(() -> {
-                        for (QueryDocumentSnapshot doc : snapshots) {
-                            ProductTemplate template = doc.toObject(ProductTemplate.class);
-                            template.setFirestoreId(doc.getId());
-                            ProductTemplate localT = mTemplateDao.getTemplateByNameAndSku(warehouseId, template.getName(), template.getSku());
-                            if (localT != null) {
-                                template.setId(localT.getId());
-                                mTemplateDao.upsert(template);
-                            } else {
-                                mTemplateDao.upsert(template);
+                .addSnapshotListener((snapshots, e) -> {
+                    if (snapshots != null) {
+                        AppDatabase.databaseWriteExecutor.execute(() -> {
+                            for (DocumentChange dc : snapshots.getDocumentChanges()) {
+                                Item item = dc.getDocument().toObject(Item.class);
+                                item.setFirestoreId(dc.getDocument().getId());
+                                switch (dc.getType()) {
+                                    case ADDED:
+                                    case MODIFIED:
+                                        mItemDao.upsert(item);
+                                        break;
+                                    case REMOVED:
+                                        mItemDao.delete(item);
+                                        break;
+                                }
                             }
-                        }
-                    });
+                        });
+                    }
                 });
 
-        mFirestore.collection(COLLECTION_TRANSACTIONS)
+        // 2. SMART TEMPLATES SYNC
+        if (templateListener != null) templateListener.remove();
+        templateListener = mFirestore.collection("product_templates")
                 .whereEqualTo("ownerId", warehouseId)
-                .get()
-                .addOnSuccessListener(snapshots -> {
-                    AppDatabase.databaseWriteExecutor.execute(() -> {
-                        for (QueryDocumentSnapshot doc : snapshots) {
-                            Transaction t = doc.toObject(Transaction.class);
-                            t.setFirestoreId(doc.getId());
-                            mTransactionDao.insert(t); 
-                        }
-                    });
+                .addSnapshotListener((snapshots, e) -> {
+                    if (snapshots != null) {
+                        AppDatabase.databaseWriteExecutor.execute(() -> {
+                            for (DocumentChange dc : snapshots.getDocumentChanges()) {
+                                ProductTemplate t = dc.getDocument().toObject(ProductTemplate.class);
+                                t.setFirestoreId(dc.getDocument().getId());
+                                if (dc.getType() != DocumentChange.Type.REMOVED) mTemplateDao.upsert(t);
+                                else mTemplateDao.delete(t);
+                            }
+                        });
+                    }
+                });
+
+        // 3. SMART TRANSACTIONS SYNC
+        if (transactionListener != null) transactionListener.remove();
+        transactionListener = mFirestore.collection("transactions")
+                .whereEqualTo("ownerId", warehouseId)
+                .addSnapshotListener((snapshots, e) -> {
+                    if (snapshots != null) {
+                        AppDatabase.databaseWriteExecutor.execute(() -> {
+                            for (DocumentChange dc : snapshots.getDocumentChanges()) {
+                                Transaction t = dc.getDocument().toObject(Transaction.class);
+                                t.setFirestoreId(dc.getDocument().getId());
+                                if (dc.getType() == DocumentChange.Type.ADDED) mTransactionDao.insert(t);
+                            }
+                        });
+                    }
                 });
     }
 
-    public LiveData<List<Item>> getAllItems(String userId) {
-        return mItemDao.getAllItems(userId);
-    }
+    public LiveData<User> getUserProfile(String userId) { return mUserDao.getUserProfileLiveData(userId); }
+    public LiveData<List<Item>> getInventory(String warehouseId) { return mItemDao.getAllItems(warehouseId); }
+    public LiveData<List<ProductTemplate>> getTemplates(String warehouseId) { return mTemplateDao.getAllTemplates(warehouseId); }
 
-    public void insert(Item newItem) {
+    public void updateItem(Item item, int oldQty) {
         AppDatabase.databaseWriteExecutor.execute(() -> {
-            String warehouseId = (currentUserProfile != null) ? currentUserProfile.getEmployerId() : newItem.getOwnerId();
-            String brand = (newItem.getBrand() != null) ? newItem.getBrand() : "";
-            
-            newItem.setOwnerId(warehouseId);
-
-            Item existingItem = mItemDao.getItemBySku(warehouseId, newItem.getSku());
-
-            if (existingItem != null) {
-                int oldQty = existingItem.getQuantity();
-                existingItem.setQuantity(oldQty + newItem.getQuantity());
-                existingItem.setPrice(newItem.getPrice()); 
-                existingItem.setBrand(brand);
-                mItemDao.update(existingItem);
-                
-                recordTransaction("UPDATE_PLUS", existingItem.getName(), newItem.getQuantity(), 
-                        newItem.getQuantity() * newItem.getPrice(), warehouseId);
-
-                if (existingItem.getFirestoreId() != null) {
-                    mFirestore.collection(COLLECTION_ITEMS).document(existingItem.getFirestoreId())
-                            .set(existingItem, SetOptions.merge());
-                }
-            } else {
-                String cloudId = mFirestore.collection(COLLECTION_ITEMS).document().getId();
-                newItem.setFirestoreId(cloudId);
-                mItemDao.insert(newItem);
-                
-                recordTransaction("ADD", newItem.getName(), newItem.getQuantity(), 
-                        newItem.getQuantity() * newItem.getPrice(), warehouseId);
-
-                mFirestore.collection(COLLECTION_ITEMS).document(cloudId).set(newItem);
+            mItemDao.update(item); 
+            if (item.getFirestoreId() != null) {
+                mFirestore.collection("items").document(item.getFirestoreId()).set(item, SetOptions.merge());
             }
-            
-            ProductTemplate template = new ProductTemplate(newItem.getName(), newItem.getSku(), newItem.getPrice(), warehouseId, brand);
-            template.setLowStockThreshold(newItem.getLowStockThreshold());
-            upsertTemplate(template);
+            int diff = item.getQuantity() - oldQty;
+            if (diff != 0) recordTransaction(diff > 0 ? "UPDATE_PLUS" : "UPDATE_MINUS", item, Math.abs(diff));
         });
     }
 
-    public void upsertTemplate(ProductTemplate template) {
+    public void insertItem(Item item) {
         AppDatabase.databaseWriteExecutor.execute(() -> {
-            ProductTemplate existing = mTemplateDao.getTemplateByNameAndSku(template.getOwnerId(), template.getName(), template.getSku());
+            Item existing = mItemDao.getItemBySku(item.getOwnerId(), item.getSku());
             if (existing != null) {
-                template.setId(existing.getId());
-                template.setFirestoreId(existing.getFirestoreId());
-                mTemplateDao.upsert(template);
-                if (template.getFirestoreId() != null) {
-                    mFirestore.collection(COLLECTION_TEMPLATES).document(template.getFirestoreId()).set(template, SetOptions.merge());
-                }
+                int old = existing.getQuantity();
+                existing.setQuantity(old + item.getQuantity());
+                updateItem(existing, old);
             } else {
-                String cloudId = mFirestore.collection(COLLECTION_TEMPLATES).document().getId();
-                template.setFirestoreId(cloudId);
-                mTemplateDao.upsert(template);
-                mFirestore.collection(COLLECTION_TEMPLATES).document(cloudId).set(template);
+                String id = mFirestore.collection("items").document().getId();
+                item.setFirestoreId(id);
+                mItemDao.insert(item);
+                mFirestore.collection("items").document(id).set(item);
+                recordTransaction("ADD", item, item.getQuantity());
             }
+            ProductTemplate pt = new ProductTemplate(item.getName(), item.getSku(), item.getPrice(), item.getOwnerId(), item.getBrand());
+            pt.setLowStockThreshold(item.getLowStockThreshold());
+            upsertTemplate(pt);
         });
     }
 
-    public void deleteTemplate(ProductTemplate template) {
+    private void recordTransaction(String type, Item item, int qty) {
+        String uid = FirebaseAuth.getInstance().getUid();
         AppDatabase.databaseWriteExecutor.execute(() -> {
-            if (template.getFirestoreId() != null) {
-                mFirestore.collection(COLLECTION_TEMPLATES).document(template.getFirestoreId()).delete();
-            }
-            mTemplateDao.delete(template);
+            User u = mUserDao.getUserById(uid);
+            Transaction t = new Transaction(type, item.getName(), qty, qty * item.getPrice(), System.currentTimeMillis(), item.getOwnerId(), 
+                    u != null ? u.getDisplayName() : "מערכת", u != null ? u.getRole() : "UNKNOWN");
+            String tid = mFirestore.collection("transactions").document().getId();
+            t.setFirestoreId(tid);
+            mTransactionDao.insert(t);
+            mFirestore.collection("transactions").document(tid).set(t);
         });
     }
 
-    public LiveData<List<ProductTemplate>> getAllTemplates(String userId) {
-        return mTemplateDao.getAllTemplates(userId);
-    }
-
-    public void update(Item item, int oldQuantity) {
+    public void deleteItem(Item item) {
         AppDatabase.databaseWriteExecutor.execute(() -> {
-            mItemDao.update(item);
-            int diff = item.getQuantity() - oldQuantity;
-            if (diff != 0) {
-                String type = diff > 0 ? "UPDATE_PLUS" : "UPDATE_MINUS";
-                recordTransaction(type, item.getName(), Math.abs(diff), 
-                        Math.abs(diff) * item.getPrice(), item.getOwnerId());
-            }
-
-            if (item.getFirestoreId() != null) {
-                mFirestore.collection(COLLECTION_ITEMS).document(item.getFirestoreId())
-                        .set(item, SetOptions.merge());
-            }
-        });
-    }
-
-    public void delete(Item item) {
-        AppDatabase.databaseWriteExecutor.execute(() -> {
-            if (item.getFirestoreId() != null) {
-                mFirestore.collection(COLLECTION_ITEMS).document(item.getFirestoreId()).delete();
-            }
+            if (item.getFirestoreId() != null) mFirestore.collection("items").document(item.getFirestoreId()).delete();
             mItemDao.delete(item);
-            recordTransaction("DELETE", item.getName(), item.getQuantity(), 
-                    item.getQuantity() * item.getPrice(), item.getOwnerId());
+            recordTransaction("DELETE", item, item.getQuantity());
         });
     }
 
-    private void recordTransaction(String type, String itemName, int qty, double amount, String warehouseId) {
-        long now = System.currentTimeMillis();
-        String name = "מערכת";
-        String role = "UNKNOWN";
-        if (currentUserProfile != null) {
-            name = currentUserProfile.getDisplayName();
-            role = currentUserProfile.getRole();
-        }
-        
-        Transaction t = new Transaction(type, itemName, qty, amount, now, warehouseId, name, role);
-        String cloudId = mFirestore.collection(COLLECTION_TRANSACTIONS).document().getId();
-        t.setFirestoreId(cloudId);
-        mTransactionDao.insert(t);
-        mFirestore.collection(COLLECTION_TRANSACTIONS).document(cloudId).set(t);
-    }
-
-    public LiveData<User> getUserProfile(String userId) {
-        return mUserDao.getUserProfileLiveData(userId);
-    }
-
-    public LiveData<List<Item>> searchDatabase(String searchQuery) {
-        return mItemDao.searchDatabase(searchQuery);
-    }
-
-    public LiveData<List<Transaction>> getAllTransactions(String userId) {
-        return mTransactionDao.searchTransactions(userId, "%%");
-    }
-
-    public LiveData<List<Transaction>> searchTransactions(String userId, String query) {
-        return mTransactionDao.searchTransactions(userId, "%" + query + "%");
-    }
-
-    public LiveData<List<Transaction>> getTransactionsByDateRange(String userId, long start, long end) {
-        return mTransactionDao.getTransactionsByDateRange(userId, start, end);
-    }
-
-    public LiveData<Integer> getTotalItemsCount(String userId) {
-        return mItemDao.getTotalItemsCount(userId);
-    }
-
-    public LiveData<Double> getTotalInventoryValue(String userId) {
-        return mItemDao.getTotalInventoryValue(userId);
-    }
-
-    public void cleanOldTransactions(long threshold, String userId) {
+    public void upsertTemplate(ProductTemplate t) {
         AppDatabase.databaseWriteExecutor.execute(() -> {
-            mTransactionDao.deleteOldTransactions(threshold);
-            mFirestore.collection(COLLECTION_TRANSACTIONS)
-                    .whereEqualTo("ownerId", userId)
-                    .whereLessThan("timestamp", threshold)
-                    .get()
-                    .addOnSuccessListener(snapshots -> {
-                        WriteBatch batch = mFirestore.batch();
-                        for (QueryDocumentSnapshot doc : snapshots) {
-                            batch.delete(doc.getReference());
-                        }
-                        batch.commit();
-                    });
+            ProductTemplate existing = mTemplateDao.getTemplateByNameAndSku(t.getOwnerId(), t.getName(), t.getSku());
+            if (existing != null) { t.setId(existing.getId()); t.setFirestoreId(existing.getFirestoreId()); }
+            else { t.setFirestoreId(mFirestore.collection("product_templates").document().getId()); }
+            mTemplateDao.upsert(t);
+            mFirestore.collection("product_templates").document(t.getFirestoreId()).set(t, SetOptions.merge());
         });
     }
 
-    public void logoutOnly(Runnable onComplete) {
+    public void deleteTemplate(ProductTemplate t) {
         AppDatabase.databaseWriteExecutor.execute(() -> {
-            try {
-                mDb.clearAllTables();
-                FirebaseAuth.getInstance().signOut();
-                currentUserProfile = null;
-                if (onComplete != null) onComplete.run();
-            } catch (Exception e) {
-                Log.e("Logout", "Logout failed", e);
-            }
+            if (t.getFirestoreId() != null) mFirestore.collection("product_templates").document(t.getFirestoreId()).delete();
+            mTemplateDao.delete(t);
         });
     }
 
     public void logoutAndReset(Runnable onComplete) {
-        String uid = FirebaseAuth.getInstance().getUid();
-        
-        // 1. Delete user document from Cloud so they MUST re-register
-        if (uid != null) {
-            mFirestore.collection("users").document(uid).delete()
-                .addOnCompleteListener(task -> {
-                    // 2. Clear local data and sign out regardless of cloud success
-                    AppDatabase.databaseWriteExecutor.execute(() -> {
-                        try {
-                            mDb.clearAllTables();
-                            FirebaseAuth.getInstance().signOut();
-                            currentUserProfile = null;
-                            Log.d("Logout", "Cloud profile deleted and local DB cleared");
-                            
-                            if (onComplete != null) {
-                                onComplete.run();
-                            }
-                        } catch (Exception e) {
-                            Log.e("Logout", "Reset failed", e);
-                        }
-                    });
-                });
-        } else {
-            // Not logged in anyway, just clear and finish
-            if (onComplete != null) onComplete.run();
-        }
+        AppDatabase.databaseWriteExecutor.execute(() -> {
+            try {
+                if (userListener != null) userListener.remove();
+                if (inventoryListener != null) inventoryListener.remove();
+                if (templateListener != null) templateListener.remove();
+                if (transactionListener != null) transactionListener.remove();
+                mDb.clearAllTables();
+                FirebaseAuth.getInstance().signOut();
+                if (onComplete != null) onComplete.run();
+            } catch (Exception ignored) {}
+        });
     }
+
+    public LiveData<List<Item>> searchDatabase(String warehouseId, String q) { return mItemDao.searchDatabase(warehouseId, "%" + q + "%"); }
+    public LiveData<List<Transaction>> getAllTransactions(String wid) { return mTransactionDao.searchTransactions(wid, "%%"); }
+    public LiveData<List<Transaction>> searchTransactions(String wid, String q) { return mTransactionDao.searchTransactions(wid, "%" + q + "%"); }
+    public LiveData<List<Transaction>> getTransactionsByRange(String wid, long s, long e) { return mTransactionDao.getTransactionsByDateRange(wid, s, e); }
+    public LiveData<Integer> getCount(String wid) { return mItemDao.getTotalItemsCount(wid); }
+    public LiveData<Double> getValue(String wid) { return mItemDao.getTotalInventoryValue(wid); }
 }

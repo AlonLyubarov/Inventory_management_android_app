@@ -31,8 +31,8 @@ public interface ItemDao {
     @Query("SELECT * FROM items_table WHERE ownerId = :userId ORDER BY name ASC, id ASC")
     LiveData<List<Item>> getAllItems(String userId);
 
-    @Query("SELECT * FROM items_table WHERE name LIKE :searchQuery OR sku LIKE :searchQuery ORDER BY name ASC, id ASC")
-    LiveData<List<Item>> searchDatabase(String searchQuery);
+    @Query("SELECT * FROM items_table WHERE ownerId = :userId AND (name LIKE :searchQuery OR sku LIKE :searchQuery) ORDER BY name ASC, id ASC")
+    LiveData<List<Item>> searchDatabase(String userId, String searchQuery);
 
     @Query("SELECT * FROM items_table WHERE firestoreId = :firestoreId LIMIT 1")
     Item getItemByFirestoreId(String firestoreId);
