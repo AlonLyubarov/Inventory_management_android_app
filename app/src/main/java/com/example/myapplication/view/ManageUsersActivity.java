@@ -53,30 +53,18 @@ public class ManageUsersActivity extends AppCompatActivity {
     }
 
     private void loadMyTeam() {
-        // Using a real-time listener so the list updates automatically when a worker is added or changed
         mFirestore.collection("users")
                 .whereEqualTo("employerId", currentManagerId)
                 .addSnapshotListener((snapshots, e) -> {
-                    if (e != null) {
-                        Toast.makeText(this, "שגיאה בעדכון הרשימה", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
                     if (snapshots != null) {
                         List<User> userList = new ArrayList<>();
-                        android.util.Log.d("ManageUsers", "Found " + snapshots.size() + " total users in snapshots");
                         for (QueryDocumentSnapshot doc : snapshots) {
                             User user = doc.toObject(User.class);
-                            // Safety fix: If userId is missing inside the object, take it from the document ID
-                            if (user.getUserId() == null) {
-                                user.setUserId(doc.getId());
-                            }
-                            
-                            // Don't show the manager himself, only his team
+                            if (user.getUserId() == null) user.setUserId(doc.getId());
                             if (!user.getUserId().equals(currentManagerId)) {
                                 userList.add(user);
                             }
                         }
-                        android.util.Log.d("ManageUsers", "Final team list size: " + userList.size());
                         adapter.setUsers(userList);
                     }
                 });
@@ -94,21 +82,23 @@ public class ManageUsersActivity extends AppCompatActivity {
                         return;
                     }
                     for (QueryDocumentSnapshot doc : snapshots) {
-                        // Fix M2: Selective update instead of set() to avoid overwriting unrelated fields
+                        User worker = doc.toObject(User.class);
+                        
+                        // Fix H3: Prevent linking a user who is already a MANAGER
+                        if ("MANAGER".equals(worker.getRole())) {
+                            Toast.makeText(this, "לא ניתן לצרף משתמש שהוא מנהל בעצמו", Toast.LENGTH_LONG).show();
+                            return;
+                        }
+                        
                         mFirestore.collection("users").document(doc.getId())
                                 .update("employerId", currentManagerId)
-                                .addOnSuccessListener(aVoid -> {
-                                    Toast.makeText(this, "העובד צורף לצוות שלך", Toast.LENGTH_SHORT).show();
-                                })
-                                .addOnFailureListener(err -> {
-                                    Toast.makeText(this, "שגיאה בחיבור העובד", Toast.LENGTH_SHORT).show();
-                                });
+                                .addOnSuccessListener(aVoid -> Toast.makeText(this, "העובד צורף בהצלחה", Toast.LENGTH_SHORT).show())
+                                .addOnFailureListener(err -> Toast.makeText(this, "שגיאה בחיבור העובד", Toast.LENGTH_SHORT).show());
                     }
                 });
     }
 
     private void updateUserRole(User user, String newRole) {
-        // Fix M2: Selective update for role
         mFirestore.collection("users").document(user.getUserId())
                 .update("role", newRole)
                 .addOnSuccessListener(aVoid -> Toast.makeText(this, "הרשאה עודכנה", Toast.LENGTH_SHORT).show());

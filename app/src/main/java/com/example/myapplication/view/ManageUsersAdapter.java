@@ -20,8 +20,6 @@ public class ManageUsersAdapter extends RecyclerView.Adapter<ManageUsersAdapter.
 
     private List<User> users = new ArrayList<>();
     private OnRoleChangeListener listener;
-    private final String[] roleLabels = {"עובד מחסן", "ראש משמרת", "מנהל מחסן"};
-    private final String[] roleValues = {"WORKER", "SHIFT_LEADER", "MANAGER"};
 
     public interface OnRoleChangeListener {
         void onRoleChanged(User user, String newRole);
@@ -41,54 +39,57 @@ public class ManageUsersAdapter extends RecyclerView.Adapter<ManageUsersAdapter.
     @Override
     public void onBindViewHolder(@NonNull UserHolder holder, int position) {
         User user = users.get(position);
-        holder.textName.setText(user.getDisplayName());
-        holder.textEmail.setText(user.getEmail());
-
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(holder.itemView.getContext(), 
-                android.R.layout.simple_spinner_item, roleLabels);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        holder.spinnerRole.setAdapter(adapter);
-
-        // Set current role
-        for (int i = 0; i < roleValues.length; i++) {
-            if (roleValues[i].equals(user.getRole())) {
-                holder.spinnerRole.setSelection(i);
-                break;
-            }
-        }
-
-        holder.spinnerRole.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
-                String newRole = roleValues[pos];
-                if (!newRole.equals(user.getRole()) && listener != null) {
-                    listener.onRoleChanged(user, newRole);
-                }
-            }
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {}
-        });
+        holder.bind(user, listener);
     }
 
     @Override
-    public int getItemCount() {
-        return users.size();
-    }
+    public int getItemCount() { return users.size(); }
 
-    public void setUsers(List<User> users) {
-        this.users = users;
+    public void setUsers(List<User> userList) {
+        this.users = userList;
         notifyDataSetChanged();
     }
 
     static class UserHolder extends RecyclerView.ViewHolder {
-        TextView textName, textEmail;
-        Spinner spinnerRole;
+        private final TextView textName, textEmail;
+        private final Spinner spinnerRole;
+        private boolean isInitializing = false;
 
         public UserHolder(@NonNull View itemView) {
             super(itemView);
             textName = itemView.findViewById(R.id.text_user_name);
             textEmail = itemView.findViewById(R.id.text_user_email);
             spinnerRole = itemView.findViewById(R.id.spinner_user_role);
+
+            String[] roles = {"WORKER", "SHIFT_LEADER"};
+            ArrayAdapter<String> adapter = new ArrayAdapter<>(itemView.getContext(), android.R.layout.simple_spinner_dropdown_item, roles);
+            spinnerRole.setAdapter(adapter);
+        }
+
+        public void bind(User user, OnRoleChangeListener listener) {
+            // Fix H4: Prevent listener trigger during recycling/initialization
+            isInitializing = true;
+            
+            textName.setText(user.getDisplayName());
+            textEmail.setText(user.getEmail());
+
+            if ("SHIFT_LEADER".equals(user.getRole())) spinnerRole.setSelection(1);
+            else spinnerRole.setSelection(0);
+
+            spinnerRole.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                @Override
+                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                    if (!isInitializing) {
+                        String newRole = (position == 1) ? "SHIFT_LEADER" : "WORKER";
+                        if (!newRole.equals(user.getRole())) {
+                            listener.onRoleChanged(user, newRole);
+                        }
+                    }
+                }
+                @Override public void onNothingSelected(AdapterView<?> parent) {}
+            });
+            
+            isInitializing = false;
         }
     }
 }

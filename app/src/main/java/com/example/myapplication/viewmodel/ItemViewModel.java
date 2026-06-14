@@ -87,7 +87,9 @@ public class ItemViewModel extends AndroidViewModel {
     public LiveData<Integer> getTotalItemsCount(String wid) { return mRepository.getCount(wid); }
     public LiveData<Double> getTotalInventoryValue(String wid) { return mRepository.getValue(wid); }
 
-    public void logoutAndReset(Runnable onComplete) { mRepository.logoutAndReset(onComplete); }
+    public void logoutAndReset(Runnable onComplete, java.util.function.Consumer<String> onError) { 
+        mRepository.logoutAndReset(onComplete, onError); 
+    }
     public void logoutOnly(Runnable onComplete) { mRepository.logoutOnly(onComplete); }
 
     // Bridges

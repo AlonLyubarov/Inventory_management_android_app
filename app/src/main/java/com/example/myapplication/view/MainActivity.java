@@ -38,6 +38,7 @@ public class MainActivity extends AppCompatActivity {
 
     private final android.os.Handler searchHandler = new android.os.Handler(android.os.Looper.getMainLooper());
     private Runnable searchRunnable;
+    private boolean isSearching = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -58,31 +59,29 @@ public class MainActivity extends AppCompatActivity {
             if (user != null) {
                 invalidateOptionsMenu();
                 String warehouseId = user.getEmployerId();
+                
+                // Fix C1: Improved Pending State Feedback
                 if ("PENDING".equals(warehouseId)) {
                     buttonAdd.setEnabled(false);
                     buttonAdd.setText(R.string.pending_approval);
+                    adapter.setItems(new java.util.ArrayList<>()); // Show empty while pending
                 } else {
                     buttonAdd.setEnabled(true);
                     buttonAdd.setText(R.string.button_add);
+                    viewModel.setWarehouseContext(warehouseId);
                 }
-                viewModel.setWarehouseContext(warehouseId);
             }
         });
     }
 
     private void setupStableStreams() {
-        // Observe base inventory
+        // Fix H1: Prevent inventoryStream from overriding search results
         viewModel.getInventoryStream().observe(this, items -> {
-            // Only update adapter if search is NOT active
-            if (viewModel.getSearchStream().hasObservers() && items != null) {
-                // Potential logic to filter but usually searchStream handles it
-            }
-            adapter.setItems(items);
+            if (!isSearching && items != null) adapter.setItems(items);
         });
 
-        // Observe reactive search stream (Fix M5)
         viewModel.getSearchStream().observe(this, items -> {
-            if (items != null) adapter.setItems(items);
+            if (isSearching && items != null) adapter.setItems(items);
         });
 
         viewModel.getTemplateStream().observe(this, templates -> {
@@ -127,9 +126,9 @@ public class MainActivity extends AppCompatActivity {
         });
 
         buttonAdd.setOnClickListener(v -> {
-            String name = autoTextName.getText().toString();
-            String qtyStr = editTextQuantity.getText().toString();
-            String priceStr = editTextPrice.getText().toString();
+            String name = autoTextName.getText().toString().trim();
+            String qtyStr = editTextQuantity.getText().toString().trim();
+            String priceStr = editTextPrice.getText().toString().trim();
 
             if (name.isEmpty() || qtyStr.isEmpty() || priceStr.isEmpty()) {
                 Toast.makeText(this, R.string.error_fill_fields, Toast.LENGTH_SHORT).show();
@@ -139,8 +138,15 @@ public class MainActivity extends AppCompatActivity {
             try {
                 int qty = Integer.parseInt(qtyStr);
                 double price = Double.parseDouble(priceStr);
+                
+                // Fix C3: Validation for negative numbers
+                if (qty < 0 || price < 0) {
+                    Toast.makeText(this, "נא להזין ערכים חיוביים בלבד", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
                 String ownerId = (currentUser != null) ? currentUser.getEmployerId() : uid;
-                Item newItem = new Item(name, price, qty, ownerId, editTextSku.getText().toString(), editTextBrand.getText().toString());
+                Item newItem = new Item(name, price, qty, ownerId, editTextSku.getText().toString().trim(), editTextBrand.getText().toString().trim());
                 viewModel.insert(newItem);
                 clearInputs();
             } catch (NumberFormatException e) {
@@ -164,8 +170,23 @@ public class MainActivity extends AppCompatActivity {
 
     private void performSearch(String query) {
         if (searchRunnable != null) searchHandler.removeCallbacks(searchRunnable);
-        searchRunnable = () -> viewModel.setSearchQuery(query);
+        isSearching = !query.isEmpty();
+        
+        searchRunnable = () -> {
+            viewModel.setSearchQuery(query);
+            if (query.isEmpty()) {
+                // If query cleared, force-refresh from main stream
+                viewModel.getInventoryStream().getValue(); 
+            }
+        };
         searchHandler.postDelayed(searchRunnable, 300);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        // Fix H2: Cancel pending search on pause
+        if (searchRunnable != null) searchHandler.removeCallbacks(searchRunnable);
     }
 
     @Override
@@ -178,6 +199,11 @@ public class MainActivity extends AppCompatActivity {
                 menu.findItem(R.id.action_reports).setVisible(false);
                 menu.findItem(R.id.action_catalog).setVisible(false);
             }
+        } else {
+            // Fix L3: Hide restricted items until user profile is loaded
+            menu.findItem(R.id.action_manage_users).setVisible(false);
+            menu.findItem(R.id.action_reports).setVisible(false);
+            menu.findItem(R.id.action_catalog).setVisible(false);
         }
         androidx.appcompat.widget.SearchView searchView = (androidx.appcompat.widget.SearchView) menu.findItem(R.id.action_search).getActionView();
         if (searchView != null) {
@@ -204,7 +230,7 @@ public class MainActivity extends AppCompatActivity {
     private void showLogoutDialog() {
         new AlertDialog.Builder(this)
                 .setTitle(R.string.menu_logout)
-                .setMessage(R.string.menu_logout)
+                .setMessage("האם להתנתק מהמערכת?")
                 .setPositiveButton(R.string.menu_logout, (d, w) -> viewModel.logoutOnly(this::navigateToLogin))
                 .setNegativeButton(android.R.string.cancel, null).show();
     }
@@ -254,11 +280,9 @@ public class MainActivity extends AppCompatActivity {
                         try {
                             com.google.android.libraries.identity.googleid.GoogleIdTokenCredential gitc = com.google.android.libraries.identity.googleid.GoogleIdTokenCredential.createFrom(result.getCredential().getData());
                             AuthCredential cred = com.google.firebase.auth.GoogleAuthProvider.getCredential(gitc.getIdToken(), null);
-                            if (FirebaseAuth.getInstance().getCurrentUser() != null) {
-                                FirebaseAuth.getInstance().getCurrentUser().reauthenticate(cred).addOnCompleteListener(t -> {
-                                    if (t.isSuccessful()) viewModel.logoutAndReset(MainActivity.this::navigateToLogin);
-                                });
-                            }
+                            FirebaseAuth.getInstance().getCurrentUser().reauthenticate(cred).addOnCompleteListener(t -> {
+                                if (t.isSuccessful()) viewModel.logoutAndReset(MainActivity.this::navigateToLogin, MainActivity.this::showError);
+                            });
                         } catch (Exception ignored) {}
                     }
                     @Override public void onError(androidx.credentials.exceptions.GetCredentialException e) { Toast.makeText(MainActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show(); }
@@ -270,9 +294,13 @@ public class MainActivity extends AppCompatActivity {
         if (user == null || user.getEmail() == null) return;
         AuthCredential cred = EmailAuthProvider.getCredential(user.getEmail(), password);
         user.reauthenticate(cred).addOnCompleteListener(task -> {
-            if (task.isSuccessful()) viewModel.logoutAndReset(this::navigateToLogin);
+            if (task.isSuccessful()) viewModel.logoutAndReset(this::navigateToLogin, this::showError);
             else Toast.makeText(this, R.string.error_auth_failed, Toast.LENGTH_SHORT).show();
         });
+    }
+
+    private void showError(String msg) {
+        runOnUiThread(() -> Toast.makeText(this, msg, Toast.LENGTH_LONG).show());
     }
 
     private void navigateToLogin() {
