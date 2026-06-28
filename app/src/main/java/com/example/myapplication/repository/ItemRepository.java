@@ -15,9 +15,6 @@ import com.google.firebase.firestore.SetOptions;
 import com.google.firebase.firestore.WriteBatch;
 import java.util.List;
 
-/**
- * Robust Repository for Production.
- */
 public class ItemRepository {
 
     private static final String TAG = "ItemRepository";
@@ -136,9 +133,19 @@ public class ItemRepository {
     public LiveData<User> getUserProfile(String userId) { return mUserDao.getUserProfileLiveData(userId); }
     public LiveData<List<Item>> getInventory(String warehouseId) { return mItemDao.getAllItems(warehouseId); }
     public LiveData<List<ProductTemplate>> getTemplates(String warehouseId) { return mTemplateDao.getAllTemplates(warehouseId); }
-    public LiveData<List<Item>> searchDatabase(String warehouseId, String q) { return mItemDao.searchDatabase(warehouseId, q); }
+    
+    // NEW-R1 Fix: Restored SQL wildcards for partial matching
+    public LiveData<List<Item>> searchDatabase(String warehouseId, String q) { 
+        return mItemDao.searchDatabase(warehouseId, "%" + q + "%"); 
+    }
+    
     public LiveData<List<Transaction>> getAllTransactions(String wid) { return mTransactionDao.searchTransactions(wid, "%%"); }
-    public LiveData<List<Transaction>> searchTransactions(String wid, String q) { return mTransactionDao.searchTransactions(wid, q); }
+    
+    // NEW-R1 Fix: Restored SQL wildcards for transactions
+    public LiveData<List<Transaction>> searchTransactions(String wid, String q) { 
+        return mTransactionDao.searchTransactions(wid, "%" + q + "%"); 
+    }
+    
     public LiveData<List<Transaction>> getTransactionsRange(String warehouseId, long s, long e) { return mTransactionDao.getTransactionsByDateRange(warehouseId, s, e); }
     public LiveData<Integer> getCount(String wid) { return mItemDao.getTotalItemsCount(wid); }
     public LiveData<Double> getValue(String wid) { return mItemDao.getTotalInventoryValue(wid); }
@@ -154,7 +161,9 @@ public class ItemRepository {
         if (item == null || item.getFirestoreId() == null) return;
         AppDatabase.databaseWriteExecutor.execute(() -> {
             mItemDao.update(item); 
-            mFirestore.collection("items").document(item.getFirestoreId()).set(item, SetOptions.merge());
+            if (item.getFirestoreId() != null) {
+                mFirestore.collection("items").document(item.getFirestoreId()).set(item, SetOptions.merge());
+            }
             int diff = item.getQuantity() - oldQty;
             if (diff != 0) recordTransaction(diff > 0 ? "UPDATE_PLUS" : "UPDATE_MINUS", item, Math.abs(diff));
         });
@@ -229,7 +238,6 @@ public class ItemRepository {
         if (user == null) { logoutOnly(onComplete); return; }
         String uid = user.getUid();
         
-        // B-13 Fix: Robust recursive wipe handled via WriteBatch in multiple steps
         wipeCollection("items", "ownerId", uid, () -> {
             wipeCollection("product_templates", "ownerId", uid, () -> {
                 wipeCollection("transactions", "ownerId", uid, () -> {
@@ -251,7 +259,6 @@ public class ItemRepository {
             WriteBatch batch = mFirestore.batch();
             for (DocumentSnapshot doc : snaps) batch.delete(doc.getReference());
             batch.commit().addOnCompleteListener(t -> {
-                // If more items exist, wipe again (Recursive B-13)
                 if (snaps.size() == 500) wipeCollection(coll, field, val, next);
                 else next.run();
             });

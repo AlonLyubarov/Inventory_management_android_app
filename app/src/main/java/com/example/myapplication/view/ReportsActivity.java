@@ -2,11 +2,11 @@ package com.example.myapplication.view;
 
 import android.content.Intent;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.pdf.PdfDocument;
 import android.net.Uri;
 import android.os.Bundle;
+import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
@@ -36,8 +36,10 @@ public class ReportsActivity extends AppCompatActivity {
     private ItemViewModel viewModel;
     private String warehouseId;
     private long selectedStartDate = 0, selectedEndDate = 0;
+    private TextView textDateRange;
     private final SimpleDateFormat fileDateFormat = new SimpleDateFormat("yyyyMMdd_HHmm", Locale.getDefault());
     private final SimpleDateFormat displayDateFormat = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault());
+    private final SimpleDateFormat shortDateFormat = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,6 +50,7 @@ public class ReportsActivity extends AppCompatActivity {
         if (uid == null) { finish(); return; }
 
         viewModel = new ViewModelProvider(this).get(ItemViewModel.class);
+        textDateRange = findViewById(R.id.text_selected_range); // Assuming this ID exists or I should add it
 
         viewModel.getUserProfile(uid).observe(this, user -> {
             if (user != null) this.warehouseId = user.getEmployerId();
@@ -62,11 +65,23 @@ public class ReportsActivity extends AppCompatActivity {
             picker.addOnPositiveButtonClickListener(sel -> {
                 selectedStartDate = sel.first;
                 selectedEndDate = sel.second + 86400000;
+                // B-05 Fix: UI Indication
+                String rangeText = shortDateFormat.format(new Date(selectedStartDate)) + " - " + shortDateFormat.format(new Date(sel.second));
+                if (textDateRange != null) textDateRange.setText(rangeText);
             });
+            // B-05 Fix: Reset on cancel
+            picker.addOnCancelListener(dialog -> resetDates());
+            picker.addOnNegativeButtonClickListener(view -> resetDates());
         });
 
         findViewById(R.id.button_export_transactions_csv).setOnClickListener(v -> exportTransactions(true));
         findViewById(R.id.button_export_transactions_pdf).setOnClickListener(v -> exportTransactions(false));
+    }
+
+    private void resetDates() {
+        selectedStartDate = 0;
+        selectedEndDate = 0;
+        if (textDateRange != null) textDateRange.setText("לא נבחר טווח");
     }
 
     private void exportInventory(boolean isCsv) {
@@ -86,7 +101,7 @@ public class ReportsActivity extends AppCompatActivity {
 
     private void exportTransactions(boolean isCsv) {
         if (warehouseId == null || selectedStartDate == 0) {
-            Toast.makeText(this, "Please select date range", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "אנא בחר טווח תאריכים", Toast.LENGTH_SHORT).show();
             return;
         }
         LiveData<List<Transaction>> liveData = viewModel.getTransactionsRange(warehouseId, selectedStartDate, selectedEndDate);
@@ -133,10 +148,8 @@ public class ReportsActivity extends AppCompatActivity {
         PdfDocument.Page page = startNewPage(doc, pageNum++);
         Canvas canvas = page.getCanvas();
 
-        canvas.drawText(fixRTL("Inventory Report - " + displayDateFormat.format(new Date())), 500, 40, headerPaint);
-        
-        // Table Headers
-        drawTableRow(canvas, 60, paint, true, "Product", "SKU", "Qty", "Price");
+        canvas.drawText(fixRTL("דו''ח מלאי - " + shortDateFormat.format(new Date())), 500, 40, headerPaint);
+        drawTableRow(canvas, 60, paint, true, "מוצר", "מק''ט", "כמות", "מחיר");
         
         for (Item item : items) {
             if (y > 780) {
@@ -145,7 +158,7 @@ public class ReportsActivity extends AppCompatActivity {
                 canvas = page.getCanvas();
                 y = 60;
             }
-            drawTableRow(canvas, y + 20, paint, false, item.getName(), item.getSku(), String.valueOf(item.getQuantity()), String.format("%.2f", item.getPrice()));
+            drawTableRow(canvas, y + 20, paint, false, item.getName(), item.getSku(), String.valueOf(item.getQuantity()), String.format(Locale.getDefault(), "%.2f", item.getPrice()));
             y += 30;
         }
         
@@ -166,8 +179,8 @@ public class ReportsActivity extends AppCompatActivity {
         PdfDocument.Page page = startNewPage(doc, pageNum++);
         Canvas canvas = page.getCanvas();
 
-        canvas.drawText(fixRTL("Transactions Report"), 500, 40, headerPaint);
-        drawTableRow(canvas, 60, paint, true, "Date", "Type", "Item", "Qty");
+        canvas.drawText(fixRTL("דו''ח פעולות"), 500, 40, headerPaint);
+        drawTableRow(canvas, 60, paint, true, "תאריך", "סוג", "פריט", "כמות");
 
         for (Transaction log : logs) {
             if (y > 780) {
@@ -187,11 +200,11 @@ public class ReportsActivity extends AppCompatActivity {
     private void drawTableRow(Canvas canvas, int y, Paint paint, boolean isHeader, String col1, String col2, String col3, String col4) {
         if (isHeader) paint.setFakeBoldText(true);
         
-        // Adjusting columns for RTL flow (Right to Left)
-        canvas.drawText(fixRTL(col1), 400, y, paint); // Name/Date
-        canvas.drawText(fixRTL(col2), 250, y, paint); // SKU/Type
-        canvas.drawText(fixRTL(col3), 150, y, paint); // Qty
-        canvas.drawText(fixRTL(col4), 50, y, paint);  // Price
+        // B-03 Fix: RTL Column order and content fixing
+        canvas.drawText(fixRTL(col1), 400, y, paint); 
+        canvas.drawText(fixRTL(col2), 250, y, paint); 
+        canvas.drawText(fixRTL(col3), 150, y, paint); 
+        canvas.drawText(fixRTL(col4), 50, y, paint);  
         
         if (isHeader) {
             paint.setFakeBoldText(false);
@@ -205,25 +218,32 @@ public class ReportsActivity extends AppCompatActivity {
     }
 
     /**
-     * Corrects BiDi mixed text by handling Hebrew word order.
+     * B-03 Fix: Word-aware RTL reversal. 
+     * Reverses only words containing Hebrew characters, keeping English/Numbers readable.
      */
     private String fixRTL(String text) {
         if (text == null || text.isEmpty()) return "";
         
-        // Check if contains Hebrew characters
-        boolean hasHebrew = false;
-        for (char c : text.toCharArray()) {
-            if (c >= '\u0590' && c <= '\u05FF') {
-                hasHebrew = true;
-                break;
-            }
-        }
+        String[] words = text.split(" ");
+        StringBuilder result = new StringBuilder();
         
-        if (!hasHebrew) return text;
-
-        // Manual BiDi logic: Reverse the whole string for Canvas.drawText
-        // Then handle numbers/english segments if they appear "flipped"
-        return new StringBuilder(text).reverse().toString();
+        // Processing words in visual order (Reverse for RTL rendering)
+        for (int i = words.length - 1; i >= 0; i--) {
+            String word = words[i];
+            boolean isHebrew = false;
+            for (char c : word.toCharArray()) {
+                if (c >= '\u0590' && c <= '\u05FF') { isHebrew = true; break; }
+            }
+            
+            if (isHebrew) {
+                result.append(new StringBuilder(word).reverse());
+            } else {
+                result.append(word);
+            }
+            
+            if (i > 0) result.append(" ");
+        }
+        return result.toString();
     }
 
     private void shareFile(String prefix, String data, String ext) {
@@ -249,6 +269,6 @@ public class ReportsActivity extends AppCompatActivity {
                 .setType(mime)
                 .putExtra(Intent.EXTRA_STREAM, uri)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivity(Intent.createChooser(intent, "Share Report"));
+        startActivity(Intent.createChooser(intent, "שתף דוח"));
     }
 }
