@@ -61,5 +61,21 @@
     <string name="worker_email_hint">אימייל העובד</string>
     <string name="button_link_worker">צרף</string>
     <string name="my_team_label">הצוות שלי</string>
+    <string name="success_worker_linked">העובד צורף בהצלחה</string>
+    <string name="error_worker_link_failed">שגיאה בחיבור העובד</string>
+    <string name="success_permission_updated">הרשאה עודכנה</string>
+    <string name="type_add">הוספה</string>
+    <string name="type_delete">מחיקה</string>
+    <string name="type_update_plus">כניסה (+)</string>
+    <string name="type_update_minus">יציאה (-)</string>
+    <string name="role_manager">מנהל</string>
+    <string name="role_leader">ר.משמרת</string>
+    <string name="role_worker">עובד</string>
+    <string name="role_unknown">לא ידוע</string>
+    <string name="system_label">מערכת</string>
+    <string name="qty_label">כמות:</string>
+    <string name="value_label">שווי:</string>
+    <string name="no_range_selected">לא נבחר טווח</string>
+    <string name="error_no_email_found">לא נמצא משתמש עם המייל: %s</string>
 
 </resources>

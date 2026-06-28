@@ -25,7 +25,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.text.Bidi;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
@@ -50,7 +49,7 @@ public class ReportsActivity extends AppCompatActivity {
         if (uid == null) { finish(); return; }
 
         viewModel = new ViewModelProvider(this).get(ItemViewModel.class);
-        textDateRange = findViewById(R.id.text_selected_range); // Assuming this ID exists or I should add it
+        textDateRange = findViewById(R.id.text_selected_range);
 
         viewModel.getUserProfile(uid).observe(this, user -> {
             if (user != null) this.warehouseId = user.getEmployerId();
@@ -65,11 +64,9 @@ public class ReportsActivity extends AppCompatActivity {
             picker.addOnPositiveButtonClickListener(sel -> {
                 selectedStartDate = sel.first;
                 selectedEndDate = sel.second + 86400000;
-                // B-05 Fix: UI Indication
                 String rangeText = shortDateFormat.format(new Date(selectedStartDate)) + " - " + shortDateFormat.format(new Date(sel.second));
                 if (textDateRange != null) textDateRange.setText(rangeText);
             });
-            // B-05 Fix: Reset on cancel
             picker.addOnCancelListener(dialog -> resetDates());
             picker.addOnNegativeButtonClickListener(view -> resetDates());
         });
@@ -81,7 +78,7 @@ public class ReportsActivity extends AppCompatActivity {
     private void resetDates() {
         selectedStartDate = 0;
         selectedEndDate = 0;
-        if (textDateRange != null) textDateRange.setText("לא נבחר טווח");
+        if (textDateRange != null) textDateRange.setText(R.string.no_range_selected);
     }
 
     private void exportInventory(boolean isCsv) {
@@ -199,13 +196,10 @@ public class ReportsActivity extends AppCompatActivity {
 
     private void drawTableRow(Canvas canvas, int y, Paint paint, boolean isHeader, String col1, String col2, String col3, String col4) {
         if (isHeader) paint.setFakeBoldText(true);
-        
-        // B-03 Fix: RTL Column order and content fixing
         canvas.drawText(fixRTL(col1), 400, y, paint); 
         canvas.drawText(fixRTL(col2), 250, y, paint); 
         canvas.drawText(fixRTL(col3), 150, y, paint); 
         canvas.drawText(fixRTL(col4), 50, y, paint);  
-        
         if (isHeader) {
             paint.setFakeBoldText(false);
             canvas.drawLine(50, y + 5, 550, y + 5, paint);
@@ -218,29 +212,21 @@ public class ReportsActivity extends AppCompatActivity {
     }
 
     /**
-     * B-03 Fix: Word-aware RTL reversal. 
-     * Reverses only words containing Hebrew characters, keeping English/Numbers readable.
+     * Proper BiDi-aware RTL reversal.
+     * Reverses the overall word order and then flips only Hebrew words.
      */
     private String fixRTL(String text) {
         if (text == null || text.isEmpty()) return "";
-        
         String[] words = text.split(" ");
         StringBuilder result = new StringBuilder();
-        
-        // Processing words in visual order (Reverse for RTL rendering)
         for (int i = words.length - 1; i >= 0; i--) {
             String word = words[i];
-            boolean isHebrew = false;
+            boolean hasHebrew = false;
             for (char c : word.toCharArray()) {
-                if (c >= '\u0590' && c <= '\u05FF') { isHebrew = true; break; }
+                if (c >= '\u0590' && c <= '\u05FF') { hasHebrew = true; break; }
             }
-            
-            if (isHebrew) {
-                result.append(new StringBuilder(word).reverse());
-            } else {
-                result.append(word);
-            }
-            
+            if (hasHebrew) result.append(new StringBuilder(word).reverse());
+            else result.append(word);
             if (i > 0) result.append(" ");
         }
         return result.toString();

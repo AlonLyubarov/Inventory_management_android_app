@@ -1,5 +1,6 @@
 package com.example.myapplication.view;
 
+import android.content.Context;
 import android.text.format.DateFormat;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -30,15 +31,20 @@ public class TransactionAdapter extends RecyclerView.Adapter<TransactionAdapter.
     @Override
     public void onBindViewHolder(@NonNull TransactionHolder holder, int position) {
         Transaction current = transactions.get(position);
-        holder.type.setText(translateType(current.getType()));
+        Context context = holder.itemView.getContext();
+        
+        holder.type.setText(translateType(context, current.getType()));
         holder.itemName.setText(current.getItemName());
         
-        String performer = (current.getPerformedBy() != null ? current.getPerformedBy() : "System") + 
-                " [" + translateRole(current.getPerformedByRole()) + "]";
+        String systemLabel = context.getString(R.string.system_label);
+        String performer = (current.getPerformedBy() != null ? current.getPerformedBy() : systemLabel) + 
+                " [" + translateRole(context, current.getPerformedByRole()) + "]";
         holder.performer.setText(performer);
 
-        String details = String.format(Locale.getDefault(), "Qty: %d | Value: ₪%.2f", 
-                current.getQuantityChanged(), current.getAmountChanged());
+        String qtyLabel = context.getString(R.string.qty_label);
+        String valLabel = context.getString(R.string.value_label);
+        String details = String.format(Locale.getDefault(), "%s %d | %s ₪%.2f", 
+                qtyLabel, current.getQuantityChanged(), valLabel, current.getAmountChanged());
         holder.details.setText(details);
 
         String dateString = DateFormat.format("dd/MM/yy HH:mm", current.getTimestamp()).toString();
@@ -60,22 +66,22 @@ public class TransactionAdapter extends RecyclerView.Adapter<TransactionAdapter.
         }
     }
 
-    private String translateType(String type) {
+    private String translateType(Context ctx, String type) {
         switch (type) {
-            case "ADD": return "Add";
-            case "DELETE": return "Delete";
-            case "UPDATE_PLUS": return "In (+)";
-            case "UPDATE_MINUS": return "Out (-)";
+            case "ADD": return ctx.getString(R.string.type_add);
+            case "DELETE": return ctx.getString(R.string.type_delete);
+            case "UPDATE_PLUS": return ctx.getString(R.string.type_update_plus);
+            case "UPDATE_MINUS": return ctx.getString(R.string.type_update_minus);
             default: return type;
         }
     }
 
-    private String translateRole(String role) {
-        if (role == null) return "Unknown";
+    private String translateRole(Context ctx, String role) {
+        if (role == null) return ctx.getString(R.string.role_unknown);
         switch (role) {
-            case "MANAGER": return "Manager";
-            case "SHIFT_LEADER": return "Leader";
-            case "WORKER": return "Worker";
+            case "MANAGER": return ctx.getString(R.string.role_manager);
+            case "SHIFT_LEADER": return ctx.getString(R.string.role_leader);
+            case "WORKER": return ctx.getString(R.string.role_worker);
             default: return role;
         }
     }
@@ -86,7 +92,6 @@ public class TransactionAdapter extends RecyclerView.Adapter<TransactionAdapter.
     }
 
     public void setTransactions(List<Transaction> newTransactions) {
-        // B-10 Fix: Implement DiffUtil for Transactions
         DiffUtil.DiffResult result = DiffUtil.calculateDiff(new DiffUtil.Callback() {
             @Override public int getOldListSize() { return transactions.size(); }
             @Override public int getNewListSize() { return newTransactions.size(); }

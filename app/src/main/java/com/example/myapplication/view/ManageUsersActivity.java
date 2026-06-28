@@ -56,7 +56,6 @@ public class ManageUsersActivity extends AppCompatActivity {
         mFirestore.collection("users")
                 .whereEqualTo("employerId", currentManagerId)
                 .addSnapshotListener((snapshots, e) -> {
-                    // B-04 Fix: Handle snapshot error
                     if (e != null) {
                         Toast.makeText(this, R.string.error_sync_list, Toast.LENGTH_SHORT).show();
                         return;
@@ -83,13 +82,12 @@ public class ManageUsersActivity extends AppCompatActivity {
                 .get()
                 .addOnSuccessListener(snapshots -> {
                     if (snapshots.isEmpty()) {
-                        Toast.makeText(this, "No user found with email: " + searchEmail, Toast.LENGTH_LONG).show();
+                        Toast.makeText(this, getString(R.string.error_no_email_found, searchEmail), Toast.LENGTH_LONG).show();
                         return;
                     }
                     for (QueryDocumentSnapshot doc : snapshots) {
                         User worker = doc.toObject(User.class);
                         
-                        // H3 Fix: Prevent linking a user who is already a MANAGER
                         if ("MANAGER".equals(worker.getRole())) {
                             Toast.makeText(this, R.string.error_manager_link, Toast.LENGTH_LONG).show();
                             return;
@@ -97,8 +95,8 @@ public class ManageUsersActivity extends AppCompatActivity {
                         
                         mFirestore.collection("users").document(doc.getId())
                                 .update("employerId", currentManagerId)
-                                .addOnSuccessListener(aVoid -> Toast.makeText(this, "Worker linked successfully", Toast.LENGTH_SHORT).show())
-                                .addOnFailureListener(err -> Toast.makeText(this, "Failed to link worker", Toast.LENGTH_SHORT).show());
+                                .addOnSuccessListener(aVoid -> Toast.makeText(this, R.string.success_worker_linked, Toast.LENGTH_SHORT).show())
+                                .addOnFailureListener(err -> Toast.makeText(this, R.string.error_worker_link_failed, Toast.LENGTH_SHORT).show());
                     }
                 });
     }
@@ -106,6 +104,6 @@ public class ManageUsersActivity extends AppCompatActivity {
     private void updateUserRole(User user, String newRole) {
         mFirestore.collection("users").document(user.getUserId())
                 .update("role", newRole)
-                .addOnSuccessListener(aVoid -> Toast.makeText(this, "Permission updated", Toast.LENGTH_SHORT).show());
+                .addOnSuccessListener(aVoid -> Toast.makeText(this, R.string.success_permission_updated, Toast.LENGTH_SHORT).show());
     }
 }
