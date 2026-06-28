@@ -6,6 +6,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.myapplication.R;
@@ -32,52 +33,49 @@ public class TransactionAdapter extends RecyclerView.Adapter<TransactionAdapter.
         holder.type.setText(translateType(current.getType()));
         holder.itemName.setText(current.getItemName());
         
-        // Show Performer details
-        String performer = (current.getPerformedBy() != null ? current.getPerformedBy() : "מערכת") + 
+        String performer = (current.getPerformedBy() != null ? current.getPerformedBy() : "System") + 
                 " [" + translateRole(current.getPerformedByRole()) + "]";
         holder.performer.setText(performer);
 
-        String details = String.format(Locale.getDefault(), "כמות: %d | שווי: ₪%.2f", 
+        String details = String.format(Locale.getDefault(), "Qty: %d | Value: ₪%.2f", 
                 current.getQuantityChanged(), current.getAmountChanged());
         holder.details.setText(details);
 
         String dateString = DateFormat.format("dd/MM/yy HH:mm", current.getTimestamp()).toString();
         holder.time.setText(dateString);
 
-        // Fix M7: Reset text color to default before the switch to prevent recycle bugs
         holder.type.setTextColor(0xFF212121);
 
-        // Color based on type
         switch (current.getType()) {
             case "ADD":
             case "UPDATE_PLUS":
-                holder.type.setTextColor(0xFF388E3C); // Green
+                holder.type.setTextColor(0xFF388E3C);
                 break;
             case "DELETE":
             case "UPDATE_MINUS":
-                holder.type.setTextColor(0xFFD32F2F); // Red
+                holder.type.setTextColor(0xFFD32F2F);
                 break;
             default:
-                holder.type.setTextColor(0xFF1976D2); // Blue
+                holder.type.setTextColor(0xFF1976D2);
         }
     }
 
     private String translateType(String type) {
         switch (type) {
-            case "ADD": return "הוספה";
-            case "DELETE": return "מחיקה";
-            case "UPDATE_PLUS": return "הוספת כמות";
-            case "UPDATE_MINUS": return "הורדת כמות";
+            case "ADD": return "Add";
+            case "DELETE": return "Delete";
+            case "UPDATE_PLUS": return "In (+)";
+            case "UPDATE_MINUS": return "Out (-)";
             default: return type;
         }
     }
 
     private String translateRole(String role) {
-        if (role == null) return "לא ידוע";
+        if (role == null) return "Unknown";
         switch (role) {
-            case "MANAGER": return "מנהל";
-            case "SHIFT_LEADER": return "ר.משמרת";
-            case "WORKER": return "עובד";
+            case "MANAGER": return "Manager";
+            case "SHIFT_LEADER": return "Leader";
+            case "WORKER": return "Worker";
             default: return role;
         }
     }
@@ -87,9 +85,24 @@ public class TransactionAdapter extends RecyclerView.Adapter<TransactionAdapter.
         return transactions.size();
     }
 
-    public void setTransactions(List<Transaction> transactions) {
-        this.transactions = transactions;
-        notifyDataSetChanged();
+    public void setTransactions(List<Transaction> newTransactions) {
+        // B-10 Fix: Implement DiffUtil for Transactions
+        DiffUtil.DiffResult result = DiffUtil.calculateDiff(new DiffUtil.Callback() {
+            @Override public int getOldListSize() { return transactions.size(); }
+            @Override public int getNewListSize() { return newTransactions.size(); }
+            @Override public boolean areItemsTheSame(int op, int np) {
+                String oldId = transactions.get(op).getFirestoreId();
+                String newId = newTransactions.get(np).getFirestoreId();
+                if (oldId != null && newId != null) return oldId.equals(newId);
+                return transactions.get(op).getId() == newTransactions.get(np).getId();
+            }
+            @Override public boolean areContentsTheSame(int op, int np) {
+                return transactions.get(op).getTimestamp() == newTransactions.get(np).getTimestamp() &&
+                       transactions.get(op).getQuantityChanged() == newTransactions.get(np).getQuantityChanged();
+            }
+        });
+        this.transactions = new ArrayList<>(newTransactions);
+        result.dispatchUpdatesTo(this);
     }
 
     static class TransactionHolder extends RecyclerView.ViewHolder {

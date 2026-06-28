@@ -44,6 +44,7 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemHolder> {
     public void onBindViewHolder(@NonNull ItemHolder holder, int position) {
         Item item = items.get(position);
 
+        // B-01 Fix: Always reset the text to base name first to prevent sticky "⚠️" from recycled holders
         holder.textViewName.setText(item.getName());
         holder.textViewSku.setText(item.getSku() != null ? "מק''ט: " + item.getSku() : "");
         holder.textViewQuantity.setText(String.valueOf(item.getQuantity()));
@@ -62,7 +63,6 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemHolder> {
             holder.textViewName.setText("⚠️ " + item.getName());
         }
 
-        // Actions: Pass to listener WITHOUT local modification for reactive flow
         holder.buttonPlus.setOnClickListener(v -> {
             if (listener != null) listener.onQuantityChange(item, item.getQuantity() + 1);
         });
@@ -72,7 +72,6 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemHolder> {
                 if (item.getQuantity() > 0) {
                     listener.onQuantityChange(item, item.getQuantity() - 1);
                 } else {
-                    // Provide feedback or just ignore. Senior level: prevent negative.
                     android.widget.Toast.makeText(v.getContext(), "הכמות כבר אפס", android.widget.Toast.LENGTH_SHORT).show();
                 }
             }
@@ -88,7 +87,7 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemHolder> {
 
     public void setItems(List<Item> newItems) {
         DiffUtil.DiffResult diffResult = DiffUtil.calculateDiff(new ItemDiffCallback(this.items, newItems));
-        this.items = new ArrayList<>(newItems); // Clean copy
+        this.items = new ArrayList<>(newItems);
         diffResult.dispatchUpdatesTo(this);
     }
 
@@ -101,7 +100,6 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemHolder> {
         public int getNewListSize() { return newList.size(); }
         @Override
         public boolean areItemsTheSame(int op, int np) {
-            // CRITICAL: Compare using firestoreId to prevent list jumping during sync
             String oldId = oldList.get(op).getFirestoreId();
             String newId = newList.get(np).getFirestoreId();
             if (oldId != null && newId != null) return oldId.equals(newId);
@@ -110,7 +108,11 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemHolder> {
         @Override
         public boolean areContentsTheSame(int op, int np) {
             Item o = oldList.get(op), n = newList.get(np);
-            return o.getQuantity() == n.getQuantity() && o.getPrice() == n.getPrice() && o.getName().equals(n.getName());
+            // B-06 Fix: Include lowStockThreshold in content comparison
+            return o.getQuantity() == n.getQuantity() && 
+                   o.getPrice() == n.getPrice() && 
+                   o.getName().equals(n.getName()) &&
+                   o.getLowStockThreshold() == n.getLowStockThreshold();
         }
     }
 

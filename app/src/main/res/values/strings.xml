@@ -35,7 +35,13 @@
     <string name="role_label">תפקיד העובד במערכת:</string>
     <string name="button_create_account">צור חשבון לעובד</string>
     <string name="success_profile_created">הפרופיל נוצר בהצלחה</string>
-    <string name="error_auth_failed">התחברות נכשלה</string>
+    <string name="error_auth_failed">התחברות נכשלה: %s</string>
+    <string name="error_creds_required">נא להזין אימייל וסיסמה</string>
+    <string name="error_google_failed">התחברות עם גוגל נכשלה</string>
+    <string name="error_server_access">שגיאה בגישה לשרת</string>
+    <string name="error_negative_values">נא להזין ערכים חיוביים בלבד</string>
+    <string name="error_manager_link">לא ניתן לצרף משתמש שהוא מנהל בעצמו</string>
+    <string name="error_sync_list">שגיאה בעדכון הרשימה</string>
 
     <!-- Reset Dialogs -->
     <string name="reset_dialog_title">איפוס משתמש סופי</string>

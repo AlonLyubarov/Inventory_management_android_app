@@ -8,7 +8,6 @@ import android.widget.ImageButton;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.util.Pair;
-import androidx.lifecycle.LiveData;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -19,6 +18,8 @@ import com.example.myapplication.viewmodel.ItemViewModel;
 import com.google.android.material.datepicker.MaterialDatePicker;
 import com.google.firebase.auth.FirebaseAuth;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
@@ -28,6 +29,7 @@ public class DashboardActivity extends AppCompatActivity {
     private TextView textTotalItems, textTotalValue, textFilterStatus;
     private TransactionAdapter adapter;
     private String warehouseId;
+    private final SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,7 +53,7 @@ public class DashboardActivity extends AppCompatActivity {
     }
 
     private void setupDashboardStreams() {
-        // Stream for combined warehouse and search logic
+        // Fix B-09: Observe the reactive dashboard search stream (handled in ViewModel)
         viewModel.getDashboardSearchStream().observe(this, logs -> {
             if (logs != null) adapter.setTransactions(logs);
         });
@@ -59,10 +61,8 @@ public class DashboardActivity extends AppCompatActivity {
 
     private void observeStats() {
         if (warehouseId == null) return;
-
         viewModel.getTotalItemsCount(warehouseId).observe(this, count -> 
                 textTotalItems.setText(String.valueOf(count != null ? count : 0)));
-
         viewModel.getTotalInventoryValue(warehouseId).observe(this, value -> 
                 textTotalValue.setText(String.format(Locale.getDefault(), "₪%.2f", value != null ? value : 0.0)));
     }
@@ -94,20 +94,10 @@ public class DashboardActivity extends AppCompatActivity {
             MaterialDatePicker<Pair<Long, Long>> picker = MaterialDatePicker.Builder.dateRangePicker().build();
             picker.show(getSupportFragmentManager(), "date_picker");
             picker.addOnPositiveButtonClickListener(sel -> {
-                if (warehouseId == null) return;
-                
-                // Fetch range results once
-                LiveData<List<Transaction>> liveData = viewModel.getTransactionsRange(warehouseId, sel.first, sel.second + 86400000);
-                liveData.observe(this, new androidx.lifecycle.Observer<List<Transaction>>() {
-                    @Override
-                    public void onChanged(List<Transaction> logs) {
-                        liveData.removeObserver(this);
-                        if (logs != null) {
-                            adapter.setTransactions(logs);
-                            textFilterStatus.setText("Date range selected");
-                        }
-                    }
-                });
+                // B-09 Fix: State managed in ViewModel now
+                viewModel.setDashboardDateRange(sel.first, sel.second + 86400000);
+                String range = dateFormat.format(new Date(sel.first)) + " - " + dateFormat.format(new Date(sel.second));
+                textFilterStatus.setText("Range: " + range);
             });
         });
 
@@ -115,6 +105,7 @@ public class DashboardActivity extends AppCompatActivity {
             editSearch.setText("");
             textFilterStatus.setText("Showing all activities");
             viewModel.setDashboardSearchQuery("");
+            viewModel.setDashboardDateRange(null, null); // Reset B-05 Fix
         });
     }
 }

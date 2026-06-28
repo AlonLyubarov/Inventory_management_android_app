@@ -26,6 +26,8 @@ import com.google.firebase.auth.EmailAuthProvider;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
+import java.util.List;
+
 public class MainActivity extends AppCompatActivity {
 
     private ItemViewModel viewModel;
@@ -74,12 +76,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupStableStreams() {
-        // Observer for main inventory
         viewModel.getInventoryStream().observe(this, items -> {
             if (!isSearching && items != null) adapter.setItems(items);
         });
 
-        // Observer for search results
         viewModel.getSearchStream().observe(this, items -> {
             if (isSearching && items != null) adapter.setItems(items);
         });
@@ -140,7 +140,7 @@ public class MainActivity extends AppCompatActivity {
                 double price = Double.parseDouble(priceStr);
                 
                 if (qty < 0 || price < 0) {
-                    Toast.makeText(this, "Negative values not allowed", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, R.string.error_negative_values, Toast.LENGTH_SHORT).show();
                     return;
                 }
 
@@ -173,8 +173,10 @@ public class MainActivity extends AppCompatActivity {
         
         searchRunnable = () -> {
             viewModel.setSearchQuery(query);
+            // B-02 Fix: Actually use the value to refresh the adapter when search is cleared
             if (query.isEmpty()) {
-                viewModel.getInventoryStream().getValue(); 
+                List<Item> current = viewModel.getInventoryStream().getValue();
+                if (current != null) adapter.setItems(current);
             }
         };
         searchHandler.postDelayed(searchRunnable, 300);

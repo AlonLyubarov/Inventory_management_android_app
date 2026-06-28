@@ -19,8 +19,8 @@ public interface TransactionDao {
     @Query("SELECT * FROM transactions_table WHERE firestoreId = :fid LIMIT 1")
     Transaction getByFirestoreId(String fid);
 
-    // SQL Optimization: Index usage (ownerId + timestamp)
-    @Query("SELECT * FROM transactions_table WHERE ownerId = :userId AND itemName LIKE :query ORDER BY timestamp DESC")
+    // B-07 Fix: Added ESCAPE for SQL LIKE safety
+    @Query("SELECT * FROM transactions_table WHERE ownerId = :userId AND itemName LIKE :query ESCAPE '\\' ORDER BY timestamp DESC")
     LiveData<List<Transaction>> searchTransactions(String userId, String query);
 
     @Query("SELECT * FROM transactions_table WHERE ownerId = :userId AND timestamp BETWEEN :startDate AND :endDate ORDER BY timestamp DESC")

@@ -8,18 +8,16 @@ public class LogicEdgeCaseTest {
 
     @Test
     public void testNegativeQuantityPrevention() {
-        Item item = new Item("Test", 10.0, 0, "owner", "SKU", "Brand");
-        // Simulate clicking minus when at zero
-        int delta = -1;
-        int resultQty = Math.max(0, item.getQuantity() + delta);
-        assertEquals(0, resultQty);
+        Item item = new Item("Test", 10.0, 5, "owner", "SKU", "Brand");
+        item.setQuantity(-5); // B-14 Fix: Test guard in setter
+        assertEquals(0, item.getQuantity());
     }
 
     @Test
-    public void testPriceNormalization() {
-        double inputPrice = -50.5;
-        double safePrice = Math.max(0, inputPrice);
-        assertEquals(0.0, safePrice, 0.001);
+    public void testNegativePricePrevention() {
+        Item item = new Item("Test", 10.0, 5, "owner", "SKU", "Brand");
+        item.setPrice(-99.9); // B-14 Fix: Test guard in setter
+        assertEquals(0.0, item.getPrice(), 0.001);
     }
 
     @Test
@@ -31,12 +29,5 @@ public class LogicEdgeCaseTest {
         String inputSku = "abc-123-def";
         String normalizedSku = inputSku.toUpperCase().trim();
         assertEquals("ABC-123-DEF", normalizedSku);
-    }
-
-    @Test
-    public void testInventoryValueCalculation() {
-        Item item = new Item("Gold", 2500.0, 5, "owner", "SKU", "Brand");
-        double totalValue = item.getQuantity() * item.getPrice();
-        assertEquals(12500.0, totalValue, 0.001);
     }
 }

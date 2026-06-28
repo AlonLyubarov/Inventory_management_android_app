@@ -51,7 +51,7 @@ public class LoginActivity extends AppCompatActivity {
             String password = editTextPassword.getText().toString().trim();
 
             if (email.isEmpty() || password.isEmpty()) {
-                Toast.makeText(LoginActivity.this, "Please enter email and password", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, R.string.error_creds_required, Toast.LENGTH_SHORT).show();
                 return;
             }
 
@@ -60,8 +60,8 @@ public class LoginActivity extends AppCompatActivity {
                         if (task.isSuccessful()) {
                             checkUserProfileAndNavigate(mAuth.getUid());
                         } else {
-                            Toast.makeText(LoginActivity.this, "Authentication failed: " + task.getException().getMessage(),
-                                    Toast.LENGTH_LONG).show();
+                            String error = task.getException() != null ? task.getException().getMessage() : "Unknown";
+                            Toast.makeText(this, getString(R.string.error_auth_failed, error), Toast.LENGTH_LONG).show();
                         }
                     });
         });
@@ -69,7 +69,7 @@ public class LoginActivity extends AppCompatActivity {
         buttonGoogleLogin.setOnClickListener(v -> signInWithGoogle());
 
         textViewRegister.setOnClickListener(v -> {
-            Intent intent = new Intent(LoginActivity.this, RegisterActivity.class);
+            Intent intent = new Intent(this, RegisterActivity.class);
             startActivity(intent);
         });
     }
@@ -93,7 +93,7 @@ public class LoginActivity extends AppCompatActivity {
                     public void onResult(GetCredentialResponse result) { handleSignInResult(result); }
                     @Override
                     public void onError(GetCredentialException e) {
-                        Toast.makeText(LoginActivity.this, "Google Sign-In failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        Toast.makeText(LoginActivity.this, getString(R.string.error_google_failed), Toast.LENGTH_SHORT).show();
                     }
                 }
         );
@@ -104,8 +104,8 @@ public class LoginActivity extends AppCompatActivity {
         if (credential instanceof CustomCredential &&
                 credential.getType().equals(GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL)) {
             try {
-                GoogleIdTokenCredential googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.getData());
-                firebaseAuthWithGoogle(googleIdTokenCredential.getIdToken());
+                GoogleIdTokenCredential gitc = GoogleIdTokenCredential.createFrom(credential.getData());
+                firebaseAuthWithGoogle(gitc.getIdToken());
             } catch (Exception e) {
                 Log.e("Login", "Error parsing Google Token", e);
             }
@@ -119,7 +119,7 @@ public class LoginActivity extends AppCompatActivity {
                     if (task.isSuccessful()) {
                         checkUserProfileAndNavigate(mAuth.getUid());
                     } else {
-                        Toast.makeText(LoginActivity.this, "Firebase sync with Google failed", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(LoginActivity.this, R.string.error_server_access, Toast.LENGTH_SHORT).show();
                     }
                 });
     }
@@ -136,11 +136,11 @@ public class LoginActivity extends AppCompatActivity {
                         finish();
                     }
                 })
-                .addOnFailureListener(e -> Toast.makeText(this, "שגיאה בגישה לשרת", Toast.LENGTH_SHORT).show());
+                .addOnFailureListener(e -> Toast.makeText(this, R.string.error_server_access, Toast.LENGTH_SHORT).show());
     }
 
     private void navigateToMain() {
-        Intent intent = new Intent(LoginActivity.this, MainActivity.class);
+        Intent intent = new Intent(this, MainActivity.class);
         startActivity(intent);
         finish();
     }

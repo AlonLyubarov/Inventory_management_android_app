@@ -40,7 +40,7 @@ public class CatalogAdapter extends RecyclerView.Adapter<CatalogAdapter.CatalogH
     public void onBindViewHolder(@NonNull CatalogHolder holder, int position) {
         ProductTemplate current = templates.get(position);
         holder.textName.setText(current.getName());
-        holder.textSku.setText("מק''ט: " + current.getSku());
+        holder.textSku.setText("SKU: " + current.getSku());
         holder.textPrice.setText(String.format(Locale.getDefault(), "₪%.2f", current.getDefaultPrice()));
 
         holder.btnDelete.setOnClickListener(v -> {
@@ -65,9 +65,12 @@ public class CatalogAdapter extends RecyclerView.Adapter<CatalogAdapter.CatalogH
             public boolean areContentsTheSame(int oldItemPosition, int newItemPosition) {
                 ProductTemplate oldT = templates.get(oldItemPosition);
                 ProductTemplate newT = newTemplates.get(newItemPosition);
+                // B-11 Fix: Compare brand and threshold
                 return oldT.getName().equals(newT.getName()) && 
                        oldT.getSku().equals(newT.getSku()) && 
-                       oldT.getDefaultPrice() == newT.getDefaultPrice();
+                       oldT.getDefaultPrice() == newT.getDefaultPrice() &&
+                       java.util.Objects.equals(oldT.getBrand(), newT.getBrand()) &&
+                       oldT.getLowStockThreshold() == newT.getLowStockThreshold();
             }
         });
         this.templates = new ArrayList<>(newTemplates);

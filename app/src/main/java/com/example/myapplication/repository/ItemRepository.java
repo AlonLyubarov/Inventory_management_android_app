@@ -15,6 +15,9 @@ import com.google.firebase.firestore.SetOptions;
 import com.google.firebase.firestore.WriteBatch;
 import java.util.List;
 
+/**
+ * Robust Repository for Production.
+ */
 public class ItemRepository {
 
     private static final String TAG = "ItemRepository";
@@ -133,24 +136,18 @@ public class ItemRepository {
     public LiveData<User> getUserProfile(String userId) { return mUserDao.getUserProfileLiveData(userId); }
     public LiveData<List<Item>> getInventory(String warehouseId) { return mItemDao.getAllItems(warehouseId); }
     public LiveData<List<ProductTemplate>> getTemplates(String warehouseId) { return mTemplateDao.getAllTemplates(warehouseId); }
-    public LiveData<List<Item>> searchDatabase(String warehouseId, String q) { return mItemDao.searchDatabase(warehouseId, "%" + q + "%"); }
+    public LiveData<List<Item>> searchDatabase(String warehouseId, String q) { return mItemDao.searchDatabase(warehouseId, q); }
     public LiveData<List<Transaction>> getAllTransactions(String wid) { return mTransactionDao.searchTransactions(wid, "%%"); }
-    public LiveData<List<Transaction>> searchTransactions(String wid, String q) { return mTransactionDao.searchTransactions(wid, "%" + q + "%"); }
+    public LiveData<List<Transaction>> searchTransactions(String wid, String q) { return mTransactionDao.searchTransactions(wid, q); }
     public LiveData<List<Transaction>> getTransactionsRange(String warehouseId, long s, long e) { return mTransactionDao.getTransactionsByDateRange(warehouseId, s, e); }
     public LiveData<Integer> getCount(String wid) { return mItemDao.getTotalItemsCount(wid); }
     public LiveData<Double> getValue(String wid) { return mItemDao.getTotalInventoryValue(wid); }
 
     public void updateItemQuantity(Item item, int delta) {
         if (item == null || item.getFirestoreId() == null) return;
-        
-        int newQty = item.getQuantity() + delta;
-        if (newQty < 0) return;
-
-        // Atomically update quantity in cloud
-        mFirestore.collection("items").document(item.getFirestoreId())
-                .update("quantity", FieldValue.increment(delta))
-                .addOnSuccessListener(aVoid -> recordTransaction(delta > 0 ? "UPDATE_PLUS" : "UPDATE_MINUS", item, Math.abs(delta)))
-                .addOnFailureListener(e -> Log.e(TAG, "Update failed", e));
+        if (item.getQuantity() + delta < 0) return;
+        mFirestore.collection("items").document(item.getFirestoreId()).update("quantity", FieldValue.increment(delta))
+                .addOnSuccessListener(v -> recordTransaction(delta > 0 ? "UPDATE_PLUS" : "UPDATE_MINUS", item, Math.abs(delta)));
     }
 
     public void updateItem(Item item, int oldQty) {
@@ -165,7 +162,6 @@ public class ItemRepository {
 
     public void insertItem(Item item) {
         if (item == null || item.getOwnerId() == null) return;
-
         String name = item.getName().trim();
         String sku = (item.getSku() != null) ? item.getSku().trim().toUpperCase() : "";
         item.setName(name);
@@ -182,7 +178,6 @@ public class ItemRepository {
                 mFirestore.collection("items").document(id).set(item);
                 recordTransaction("ADD", item, item.getQuantity());
             }
-            
             ProductTemplate pt = new ProductTemplate(item.getName(), item.getSku(), item.getPrice(), item.getOwnerId(), item.getBrand());
             pt.setLowStockThreshold(item.getLowStockThreshold());
             upsertTemplate(pt);
@@ -202,14 +197,10 @@ public class ItemRepository {
         if (t == null) return;
         t.setName(t.getName().trim());
         if (t.getSku() != null) t.setSku(t.getSku().trim().toUpperCase());
-
         AppDatabase.databaseWriteExecutor.execute(() -> {
             ProductTemplate existing = mTemplateDao.getTemplateByNameAndSku(t.getOwnerId(), t.getName(), t.getSku());
-            if (existing != null) { 
-                t.setId(existing.getId()); t.setFirestoreId(existing.getFirestoreId()); 
-            } else { 
-                t.setFirestoreId(mFirestore.collection("product_templates").document().getId()); 
-            }
+            if (existing != null) { t.setId(existing.getId()); t.setFirestoreId(existing.getFirestoreId()); }
+            else { t.setFirestoreId(mFirestore.collection("product_templates").document().getId()); }
             mTemplateDao.upsert(t);
             mFirestore.collection("product_templates").document(t.getFirestoreId()).set(t, SetOptions.merge());
         });
@@ -236,29 +227,19 @@ public class ItemRepository {
     public void logoutAndReset(Runnable onComplete, java.util.function.Consumer<String> onError) {
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
         if (user == null) { logoutOnly(onComplete); return; }
-        
         String uid = user.getUid();
         
-        // Sequential wipe of user data
+        // B-13 Fix: Robust recursive wipe handled via WriteBatch in multiple steps
         wipeCollection("items", "ownerId", uid, () -> {
             wipeCollection("product_templates", "ownerId", uid, () -> {
                 wipeCollection("transactions", "ownerId", uid, () -> {
-                    mFirestore.collection("users").document(uid).delete()
-                        .addOnSuccessListener(v -> {
-                            user.delete().addOnCompleteListener(task -> {
-                                if (task.isSuccessful()) {
-                                    AppDatabase.databaseWriteExecutor.execute(() -> {
-                                        mDb.clearAllTables();
-                                        logoutOnly(onComplete);
-                                    });
-                                } else if (onError != null) {
-                                    onError.accept("Auth deletion failed - login recently required");
-                                }
-                            });
-                        })
-                        .addOnFailureListener(e -> {
-                            if (onError != null) onError.accept("Reset failed: " + e.getMessage());
+                    mFirestore.collection("users").document(uid).delete().addOnSuccessListener(v -> {
+                        user.delete().addOnCompleteListener(task -> {
+                            if (task.isSuccessful()) {
+                                AppDatabase.databaseWriteExecutor.execute(() -> { mDb.clearAllTables(); logoutOnly(onComplete); });
+                            } else if (onError != null) onError.accept("Reset failed: Recent login required.");
                         });
+                    }).addOnFailureListener(e -> { if (onError != null) onError.accept("Reset failed: " + e.getMessage()); });
                 });
             });
         });
@@ -269,7 +250,11 @@ public class ItemRepository {
             if (snaps.isEmpty()) { next.run(); return; }
             WriteBatch batch = mFirestore.batch();
             for (DocumentSnapshot doc : snaps) batch.delete(doc.getReference());
-            batch.commit().addOnCompleteListener(t -> next.run());
+            batch.commit().addOnCompleteListener(t -> {
+                // If more items exist, wipe again (Recursive B-13)
+                if (snaps.size() == 500) wipeCollection(coll, field, val, next);
+                else next.run();
+            });
         }).addOnFailureListener(e -> next.run());
     }
 
@@ -277,7 +262,6 @@ public class ItemRepository {
         if (item == null) return;
         String uid = FirebaseAuth.getInstance().getUid();
         if (uid == null) return;
-
         AppDatabase.databaseWriteExecutor.execute(() -> {
             User u = mUserDao.getUserById(uid);
             double safePrice = Math.max(0, item.getPrice());

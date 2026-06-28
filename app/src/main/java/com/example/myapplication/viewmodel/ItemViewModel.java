@@ -12,8 +12,7 @@ import com.example.myapplication.repository.ItemRepository;
 import java.util.List;
 
 /**
- * Pure Reactive ViewModel.
- * Uses switchMap for stable, always-live data streams.
+ * Senior Level Reactive ViewModel.
  */
 public class ItemViewModel extends AndroidViewModel {
 
@@ -22,13 +21,15 @@ public class ItemViewModel extends AndroidViewModel {
     private final MutableLiveData<String> searchQuery = new MutableLiveData<>("");
     private final MutableLiveData<String> dashboardSearchQuery = new MutableLiveData<>("");
     
+    // B-09 Fix: Date filtering state
+    private final MutableLiveData<Pair<Long, Long>> dashboardDateRange = new MutableLiveData<>();
+    private boolean isFilteringByDate = false;
+
     private final LiveData<List<Item>> inventoryStream;
     private final LiveData<List<ProductTemplate>> templateStream;
     private final LiveData<List<Item>> searchStream;
     
-    // Combined Dashboard Trigger (Warehouse + Query)
-    private final MediatorLiveData<Pair<String, String>> dashboardTrigger = new MediatorLiveData<>();
-    private final LiveData<List<Transaction>> dashboardSearchStream;
+    private final MediatorLiveData<List<Transaction>> dashboardSearchStream = new MediatorLiveData<>();
 
     public ItemViewModel(@NonNull Application application) {
         super(application);
@@ -40,20 +41,44 @@ public class ItemViewModel extends AndroidViewModel {
         searchStream = Transformations.switchMap(searchQuery, query -> {
             String wid = warehouseIdTrigger.getValue();
             if (wid == null) return new MutableLiveData<>();
-            return mRepository.searchDatabase(wid, query);
+            // B-07 Fix: Escape special SQL characters
+            String safe = query.replace("%", "\\%").replace("_", "\\_");
+            return mRepository.searchDatabase(wid, safe);
         });
 
-        // Initialize Combined Dashboard logic
-        dashboardTrigger.addSource(warehouseIdTrigger, wid -> dashboardTrigger.setValue(new Pair<>(wid, dashboardSearchQuery.getValue())));
-        dashboardTrigger.addSource(dashboardSearchQuery, q -> dashboardTrigger.setValue(new Pair<>(warehouseIdTrigger.getValue(), q)));
+        // dashboardSearchStream reacts to warehouse, search query, and date range
+        dashboardSearchStream.addSource(warehouseIdTrigger, wid -> refreshDashboard());
+        dashboardSearchStream.addSource(dashboardSearchQuery, q -> {
+            isFilteringByDate = false;
+            refreshDashboard();
+        });
+        dashboardSearchStream.addSource(dashboardDateRange, range -> {
+            isFilteringByDate = (range != null);
+            refreshDashboard();
+        });
+    }
 
-        dashboardSearchStream = Transformations.switchMap(dashboardTrigger, params -> {
-            if (params.first == null) return new MutableLiveData<>();
-            if (params.second == null || params.second.isEmpty()) {
-                return mRepository.getAllTransactions(params.first);
+    private void refreshDashboard() {
+        String wid = warehouseIdTrigger.getValue();
+        if (wid == null) return;
+
+        LiveData<List<Transaction>> source;
+        if (isFilteringByDate && dashboardDateRange.getValue() != null) {
+            Pair<Long, Long> range = dashboardDateRange.getValue();
+            source = mRepository.getTransactionsRange(wid, range.first, range.second);
+        } else {
+            String q = dashboardSearchQuery.getValue();
+            if (q == null || q.isEmpty()) {
+                source = mRepository.getAllTransactions(wid);
             } else {
-                return mRepository.searchTransactions(params.first, params.second);
+                String safe = q.replace("%", "\\%").replace("_", "\\_");
+                source = mRepository.searchTransactions(wid, safe);
             }
+        }
+
+        dashboardSearchStream.addSource(source, transactions -> {
+            dashboardSearchStream.setValue(transactions);
+            dashboardSearchStream.removeSource(source);
         });
     }
 
@@ -67,6 +92,11 @@ public class ItemViewModel extends AndroidViewModel {
 
     public void setSearchQuery(String query) { searchQuery.setValue(query); }
     public void setDashboardSearchQuery(String query) { dashboardSearchQuery.setValue(query); }
+    
+    public void setDashboardDateRange(Long start, Long end) {
+        if (start == null || end == null) dashboardDateRange.setValue(null);
+        else dashboardDateRange.setValue(new Pair<>(start, end));
+    }
 
     public LiveData<User> getUserProfile(String userId) { return mRepository.getUserProfile(userId); }
     public LiveData<List<Item>> getInventoryStream() { return inventoryStream; }
@@ -87,8 +117,8 @@ public class ItemViewModel extends AndroidViewModel {
     public LiveData<Integer> getTotalItemsCount(String wid) { return mRepository.getCount(wid); }
     public LiveData<Double> getTotalInventoryValue(String wid) { return mRepository.getValue(wid); }
 
-    public void logoutAndReset(Runnable onComplete, java.util.function.Consumer<String> onError) { 
-        mRepository.logoutAndReset(onComplete, onError); 
+    public void logoutAndReset(Runnable onComplete, java.util.function.Consumer<String> onError) {
+        mRepository.logoutAndReset(onComplete, onError);
     }
     public void logoutOnly(Runnable onComplete) { mRepository.logoutOnly(onComplete); }
 
@@ -97,7 +127,6 @@ public class ItemViewModel extends AndroidViewModel {
     public LiveData<List<ProductTemplate>> getTemplates(String wid) { return mRepository.getTemplates(wid); }
     public LiveData<List<Item>> search(String wid, String q) { return mRepository.searchDatabase(wid, q); }
 
-    // Helper Pair class for internal trigger logic
     private static class Pair<A, B> {
         public final A first;
         public final B second;

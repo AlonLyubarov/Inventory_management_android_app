@@ -67,11 +67,19 @@ public class ManageUsersAdapter extends RecyclerView.Adapter<ManageUsersAdapter.
         }
 
         public void bind(User user, OnRoleChangeListener listener) {
-            // Fix H4: Prevent listener trigger during recycling/initialization
             isInitializing = true;
             
             textName.setText(user.getDisplayName());
             textEmail.setText(user.getEmail());
+
+            // B-08 Fix: Handle MANAGER role in Spinner (edge case safety)
+            if ("MANAGER".equals(user.getRole())) {
+                spinnerRole.setEnabled(false);
+                isInitializing = false;
+                return;
+            } else {
+                spinnerRole.setEnabled(true);
+            }
 
             if ("SHIFT_LEADER".equals(user.getRole())) spinnerRole.setSelection(1);
             else spinnerRole.setSelection(0);

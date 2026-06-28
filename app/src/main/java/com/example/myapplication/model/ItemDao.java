@@ -40,11 +40,11 @@ public interface ItemDao {
     @Query("DELETE FROM items_table")
     void deleteAllItems();
 
-    // Optimized: Sort by firestoreId for index-based paging (if added later)
     @Query("SELECT * FROM items_table WHERE ownerId = :userId ORDER BY name ASC, firestoreId ASC")
     LiveData<List<Item>> getAllItems(String userId);
 
-    @Query("SELECT * FROM items_table WHERE ownerId = :userId AND (name LIKE :searchQuery OR sku LIKE :searchQuery) ORDER BY name ASC")
+    // B-07 Fix: Add ESCAPE '\\' to handle literal % or _ in search
+    @Query("SELECT * FROM items_table WHERE ownerId = :userId AND (name LIKE :searchQuery ESCAPE '\\' OR sku LIKE :searchQuery ESCAPE '\\') ORDER BY name ASC")
     LiveData<List<Item>> searchDatabase(String userId, String searchQuery);
 
     @Query("SELECT * FROM items_table WHERE firestoreId = :firestoreId LIMIT 1")
@@ -56,11 +56,9 @@ public interface ItemDao {
     @Query("SELECT * FROM items_table WHERE ownerId = :userId AND sku = :sku LIMIT 1")
     Item getItemBySku(String userId, String sku);
 
-    // SQL Optimization: Use specialized COUNT(*)
     @Query("SELECT COUNT(*) FROM items_table WHERE ownerId = :userId")
     LiveData<Integer> getTotalItemsCount(String userId);
 
-    // SQL Optimization: SUM price*quantity with COALESCE to prevent null results
     @Query("SELECT COALESCE(SUM(price * quantity), 0.0) FROM items_table WHERE ownerId = :userId")
     LiveData<Double> getTotalInventoryValue(String userId);
 }
