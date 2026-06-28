@@ -60,11 +60,10 @@ public class MainActivity extends AppCompatActivity {
                 invalidateOptionsMenu();
                 String warehouseId = user.getEmployerId();
                 
-                // Fix C1: Improved Pending State Feedback
                 if ("PENDING".equals(warehouseId)) {
                     buttonAdd.setEnabled(false);
                     buttonAdd.setText(R.string.pending_approval);
-                    adapter.setItems(new java.util.ArrayList<>()); // Show empty while pending
+                    adapter.setItems(new java.util.ArrayList<>());
                 } else {
                     buttonAdd.setEnabled(true);
                     buttonAdd.setText(R.string.button_add);
@@ -75,11 +74,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupStableStreams() {
-        // Fix H1: Prevent inventoryStream from overriding search results
+        // Observer for main inventory
         viewModel.getInventoryStream().observe(this, items -> {
             if (!isSearching && items != null) adapter.setItems(items);
         });
 
+        // Observer for search results
         viewModel.getSearchStream().observe(this, items -> {
             if (isSearching && items != null) adapter.setItems(items);
         });
@@ -139,9 +139,8 @@ public class MainActivity extends AppCompatActivity {
                 int qty = Integer.parseInt(qtyStr);
                 double price = Double.parseDouble(priceStr);
                 
-                // Fix C3: Validation for negative numbers
                 if (qty < 0 || price < 0) {
-                    Toast.makeText(this, "נא להזין ערכים חיוביים בלבד", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Negative values not allowed", Toast.LENGTH_SHORT).show();
                     return;
                 }
 
@@ -175,7 +174,6 @@ public class MainActivity extends AppCompatActivity {
         searchRunnable = () -> {
             viewModel.setSearchQuery(query);
             if (query.isEmpty()) {
-                // If query cleared, force-refresh from main stream
                 viewModel.getInventoryStream().getValue(); 
             }
         };
@@ -185,7 +183,6 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        // Fix H2: Cancel pending search on pause
         if (searchRunnable != null) searchHandler.removeCallbacks(searchRunnable);
     }
 
@@ -200,7 +197,6 @@ public class MainActivity extends AppCompatActivity {
                 menu.findItem(R.id.action_catalog).setVisible(false);
             }
         } else {
-            // Fix L3: Hide restricted items until user profile is loaded
             menu.findItem(R.id.action_manage_users).setVisible(false);
             menu.findItem(R.id.action_reports).setVisible(false);
             menu.findItem(R.id.action_catalog).setVisible(false);
@@ -230,7 +226,7 @@ public class MainActivity extends AppCompatActivity {
     private void showLogoutDialog() {
         new AlertDialog.Builder(this)
                 .setTitle(R.string.menu_logout)
-                .setMessage("האם להתנתק מהמערכת?")
+                .setMessage("Logout from system?")
                 .setPositiveButton(R.string.menu_logout, (d, w) -> viewModel.logoutOnly(this::navigateToLogin))
                 .setNegativeButton(android.R.string.cancel, null).show();
     }
@@ -280,9 +276,11 @@ public class MainActivity extends AppCompatActivity {
                         try {
                             com.google.android.libraries.identity.googleid.GoogleIdTokenCredential gitc = com.google.android.libraries.identity.googleid.GoogleIdTokenCredential.createFrom(result.getCredential().getData());
                             AuthCredential cred = com.google.firebase.auth.GoogleAuthProvider.getCredential(gitc.getIdToken(), null);
-                            FirebaseAuth.getInstance().getCurrentUser().reauthenticate(cred).addOnCompleteListener(t -> {
-                                if (t.isSuccessful()) viewModel.logoutAndReset(MainActivity.this::navigateToLogin, MainActivity.this::showError);
-                            });
+                            if (FirebaseAuth.getInstance().getCurrentUser() != null) {
+                                FirebaseAuth.getInstance().getCurrentUser().reauthenticate(cred).addOnCompleteListener(t -> {
+                                    if (t.isSuccessful()) viewModel.logoutAndReset(MainActivity.this::navigateToLogin, MainActivity.this::showError);
+                                });
+                            }
                         } catch (Exception ignored) {}
                     }
                     @Override public void onError(androidx.credentials.exceptions.GetCredentialException e) { Toast.makeText(MainActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show(); }
@@ -294,8 +292,11 @@ public class MainActivity extends AppCompatActivity {
         if (user == null || user.getEmail() == null) return;
         AuthCredential cred = EmailAuthProvider.getCredential(user.getEmail(), password);
         user.reauthenticate(cred).addOnCompleteListener(task -> {
-            if (task.isSuccessful()) viewModel.logoutAndReset(this::navigateToLogin, this::showError);
-            else Toast.makeText(this, R.string.error_auth_failed, Toast.LENGTH_SHORT).show();
+            if (task.isSuccessful()) {
+                viewModel.logoutAndReset(this::navigateToLogin, this::showError);
+            } else {
+                Toast.makeText(this, "Incorrect password", Toast.LENGTH_SHORT).show();
+            }
         });
     }
 

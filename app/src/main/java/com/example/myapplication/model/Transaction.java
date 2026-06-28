@@ -6,7 +6,11 @@ import androidx.room.PrimaryKey;
 import com.google.firebase.firestore.Exclude;
 import com.google.firebase.firestore.IgnoreExtraProperties;
 
-@Entity(tableName = "transactions_table", indices = {@Index(value = {"firestoreId"}, unique = true)})
+@Entity(tableName = "transactions_table", 
+        indices = {
+            @Index(value = {"firestoreId"}, unique = true),
+            @Index(value = {"ownerId", "timestamp"}) // Senior: Optimization for history lookup
+        })
 @IgnoreExtraProperties
 public class Transaction {
     @PrimaryKey(autoGenerate = true)

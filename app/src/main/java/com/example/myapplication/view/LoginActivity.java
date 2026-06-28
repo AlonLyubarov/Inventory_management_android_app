@@ -131,12 +131,12 @@ public class LoginActivity extends AppCompatActivity {
                     if (doc.exists()) {
                         navigateToMain();
                     } else {
-                        // User exists in Auth but not in Firestore: Force profile setup (role selection)
                         Intent intent = new Intent(this, RegisterActivity.class);
                         startActivity(intent);
                         finish();
                     }
-                });
+                })
+                .addOnFailureListener(e -> Toast.makeText(this, "שגיאה בגישה לשרת", Toast.LENGTH_SHORT).show());
     }
 
     private void navigateToMain() {

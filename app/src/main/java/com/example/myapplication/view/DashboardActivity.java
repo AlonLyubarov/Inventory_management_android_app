@@ -8,15 +8,18 @@ import android.widget.ImageButton;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.util.Pair;
+import androidx.lifecycle.LiveData;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.myapplication.R;
+import com.example.myapplication.model.Transaction;
 import com.example.myapplication.viewmodel.ItemViewModel;
 import com.google.android.material.datepicker.MaterialDatePicker;
 import com.google.firebase.auth.FirebaseAuth;
 
+import java.util.List;
 import java.util.Locale;
 
 public class DashboardActivity extends AppCompatActivity {
@@ -48,7 +51,7 @@ public class DashboardActivity extends AppCompatActivity {
     }
 
     private void setupDashboardStreams() {
-        // Observe reactive stream for transactions (includes search logic)
+        // Stream for combined warehouse and search logic
         viewModel.getDashboardSearchStream().observe(this, logs -> {
             if (logs != null) adapter.setTransactions(logs);
         });
@@ -81,8 +84,8 @@ public class DashboardActivity extends AppCompatActivity {
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
                 String q = s.toString();
                 viewModel.setDashboardSearchQuery(q);
-                if (!q.isEmpty()) textFilterStatus.setText("חיפוש: " + q);
-                else textFilterStatus.setText("מציג את כל הפעילויות");
+                if (!q.isEmpty()) textFilterStatus.setText("Search: " + q);
+                else textFilterStatus.setText("Showing all activities");
             }
             @Override public void afterTextChanged(Editable s) {}
         });
@@ -92,10 +95,17 @@ public class DashboardActivity extends AppCompatActivity {
             picker.show(getSupportFragmentManager(), "date_picker");
             picker.addOnPositiveButtonClickListener(sel -> {
                 if (warehouseId == null) return;
-                viewModel.getTransactionsRange(warehouseId, sel.first, sel.second + 86400000).observe(this, logs -> {
-                    if (logs != null) {
-                        adapter.setTransactions(logs);
-                        textFilterStatus.setText("מציג טווח תאריכים נבחר");
+                
+                // Fetch range results once
+                LiveData<List<Transaction>> liveData = viewModel.getTransactionsRange(warehouseId, sel.first, sel.second + 86400000);
+                liveData.observe(this, new androidx.lifecycle.Observer<List<Transaction>>() {
+                    @Override
+                    public void onChanged(List<Transaction> logs) {
+                        liveData.removeObserver(this);
+                        if (logs != null) {
+                            adapter.setTransactions(logs);
+                            textFilterStatus.setText("Date range selected");
+                        }
                     }
                 });
             });
@@ -103,7 +113,7 @@ public class DashboardActivity extends AppCompatActivity {
 
         buttonClear.setOnClickListener(v -> {
             editSearch.setText("");
-            textFilterStatus.setText("מציג את כל הפעילויות");
+            textFilterStatus.setText("Showing all activities");
             viewModel.setDashboardSearchQuery("");
         });
     }

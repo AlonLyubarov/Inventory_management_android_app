@@ -68,8 +68,14 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemHolder> {
         });
 
         holder.buttonMinus.setOnClickListener(v -> {
-            if (listener != null && item.getQuantity() > 0) 
-                listener.onQuantityChange(item, item.getQuantity() - 1);
+            if (listener != null) {
+                if (item.getQuantity() > 0) {
+                    listener.onQuantityChange(item, item.getQuantity() - 1);
+                } else {
+                    // Provide feedback or just ignore. Senior level: prevent negative.
+                    android.widget.Toast.makeText(v.getContext(), "הכמות כבר אפס", android.widget.Toast.LENGTH_SHORT).show();
+                }
+            }
         });
 
         holder.buttonDelete.setOnClickListener(v -> {

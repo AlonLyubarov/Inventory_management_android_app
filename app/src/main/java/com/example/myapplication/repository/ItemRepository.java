@@ -15,12 +15,9 @@ import com.google.firebase.firestore.SetOptions;
 import com.google.firebase.firestore.WriteBatch;
 import java.util.List;
 
-/**
- * Production-Grade Repository.
- * Fixes C2 (Normalization), C4 (Safety), C5 (Robust Reset).
- */
 public class ItemRepository {
 
+    private static final String TAG = "ItemRepository";
     private final ItemDao mItemDao;
     private final TransactionDao mTransactionDao;
     private final ProductTemplateDao mTemplateDao;
@@ -46,6 +43,7 @@ public class ItemRepository {
         
         userListener = mFirestore.collection("users").document(userId)
                 .addSnapshotListener((snapshot, e) -> {
+                    if (e != null) { Log.e(TAG, "Sync error", e); return; }
                     if (snapshot != null && snapshot.exists()) {
                         User user = snapshot.toObject(User.class);
                         if (user != null) {
@@ -64,73 +62,71 @@ public class ItemRepository {
         currentWarehouseId = warehouseId;
 
         if (inventoryListener != null) inventoryListener.remove();
+        if (templateListener != null) templateListener.remove();
+        if (transactionListener != null) transactionListener.remove();
+
         inventoryListener = mFirestore.collection("items")
                 .whereEqualTo("ownerId", warehouseId)
                 .addSnapshotListener((snapshots, e) -> {
-                    if (snapshots != null) {
-                        AppDatabase.databaseWriteExecutor.execute(() -> {
-                            for (DocumentChange dc : snapshots.getDocumentChanges()) {
-                                String fid = dc.getDocument().getId();
-                                if (dc.getType() == DocumentChange.Type.REMOVED) {
-                                    mItemDao.deleteByFirestoreId(fid);
-                                } else {
-                                    Item item = dc.getDocument().toObject(Item.class);
-                                    if (item != null) {
-                                        item.setFirestoreId(fid);
-                                        Item local = mItemDao.getItemByFirestoreId(fid);
-                                        if (local != null) item.setId(local.getId());
-                                        mItemDao.smartUpsert(item);
-                                    }
+                    if (snapshots == null) return;
+                    AppDatabase.databaseWriteExecutor.execute(() -> {
+                        for (DocumentChange dc : snapshots.getDocumentChanges()) {
+                            String fid = dc.getDocument().getId();
+                            if (dc.getType() == DocumentChange.Type.REMOVED) {
+                                mItemDao.deleteByFirestoreId(fid);
+                            } else {
+                                Item item = dc.getDocument().toObject(Item.class);
+                                if (item != null) {
+                                    item.setFirestoreId(fid);
+                                    Item local = mItemDao.getItemByFirestoreId(fid);
+                                    if (local != null) item.setId(local.getId());
+                                    mItemDao.smartUpsert(item);
                                 }
                             }
-                        });
-                    }
+                        }
+                    });
                 });
 
-        if (templateListener != null) templateListener.remove();
         templateListener = mFirestore.collection("product_templates")
                 .whereEqualTo("ownerId", warehouseId)
                 .addSnapshotListener((snapshots, e) -> {
-                    if (snapshots != null) {
-                        AppDatabase.databaseWriteExecutor.execute(() -> {
-                            for (DocumentChange dc : snapshots.getDocumentChanges()) {
-                                String fid = dc.getDocument().getId();
-                                if (dc.getType() == DocumentChange.Type.REMOVED) {
-                                    mTemplateDao.deleteByFirestoreId(fid);
-                                } else {
-                                    ProductTemplate t = dc.getDocument().toObject(ProductTemplate.class);
-                                    if (t != null) {
-                                        t.setFirestoreId(fid);
-                                        mTemplateDao.upsert(t);
-                                    }
+                    if (snapshots == null) return;
+                    AppDatabase.databaseWriteExecutor.execute(() -> {
+                        for (DocumentChange dc : snapshots.getDocumentChanges()) {
+                            String fid = dc.getDocument().getId();
+                            if (dc.getType() == DocumentChange.Type.REMOVED) {
+                                mTemplateDao.deleteByFirestoreId(fid);
+                            } else {
+                                ProductTemplate t = dc.getDocument().toObject(ProductTemplate.class);
+                                if (t != null) {
+                                    t.setFirestoreId(fid);
+                                    mTemplateDao.upsert(t);
                                 }
                             }
-                        });
-                    }
+                        }
+                    });
                 });
 
-        if (transactionListener != null) transactionListener.remove();
         transactionListener = mFirestore.collection("transactions")
                 .whereEqualTo("ownerId", warehouseId)
                 .addSnapshotListener((snapshots, e) -> {
-                    if (snapshots != null) {
-                        AppDatabase.databaseWriteExecutor.execute(() -> {
-                            for (DocumentChange dc : snapshots.getDocumentChanges()) {
-                                String fid = dc.getDocument().getId();
-                                if (dc.getType() == DocumentChange.Type.REMOVED) {
-                                    mTransactionDao.deleteByFirestoreId(fid);
-                                } else if (dc.getType() == DocumentChange.Type.ADDED) {
-                                    Transaction t = dc.getDocument().toObject(Transaction.class);
-                                    if (t != null) {
-                                        t.setFirestoreId(fid);
-                                        Transaction local = mTransactionDao.getByFirestoreId(fid);
-                                        if (local != null) t.setId(local.getId());
-                                        mTransactionDao.insert(t);
-                                    }
+                    if (snapshots == null) return;
+                    AppDatabase.databaseWriteExecutor.execute(() -> {
+                        for (DocumentChange dc : snapshots.getDocumentChanges()) {
+                            String fid = dc.getDocument().getId();
+                            if (dc.getType() == DocumentChange.Type.REMOVED) {
+                                mTransactionDao.deleteByFirestoreId(fid);
+                            } else if (dc.getType() == DocumentChange.Type.ADDED) {
+                                Transaction t = dc.getDocument().toObject(Transaction.class);
+                                if (t != null) {
+                                    t.setFirestoreId(fid);
+                                    Transaction local = mTransactionDao.getByFirestoreId(fid);
+                                    if (local != null) t.setId(local.getId());
+                                    mTransactionDao.insert(t);
                                 }
                             }
-                        });
-                    }
+                        }
+                    });
                 });
     }
 
@@ -146,20 +142,37 @@ public class ItemRepository {
 
     public void updateItemQuantity(Item item, int delta) {
         if (item == null || item.getFirestoreId() == null) return;
-        mFirestore.collection("items").document(item.getFirestoreId()).update("quantity", FieldValue.increment(delta));
-        recordTransaction(delta > 0 ? "UPDATE_PLUS" : "UPDATE_MINUS", item, Math.abs(delta));
+        
+        int newQty = item.getQuantity() + delta;
+        if (newQty < 0) return;
+
+        // Atomically update quantity in cloud
+        mFirestore.collection("items").document(item.getFirestoreId())
+                .update("quantity", FieldValue.increment(delta))
+                .addOnSuccessListener(aVoid -> recordTransaction(delta > 0 ? "UPDATE_PLUS" : "UPDATE_MINUS", item, Math.abs(delta)))
+                .addOnFailureListener(e -> Log.e(TAG, "Update failed", e));
+    }
+
+    public void updateItem(Item item, int oldQty) {
+        if (item == null || item.getFirestoreId() == null) return;
+        AppDatabase.databaseWriteExecutor.execute(() -> {
+            mItemDao.update(item); 
+            mFirestore.collection("items").document(item.getFirestoreId()).set(item, SetOptions.merge());
+            int diff = item.getQuantity() - oldQty;
+            if (diff != 0) recordTransaction(diff > 0 ? "UPDATE_PLUS" : "UPDATE_MINUS", item, Math.abs(diff));
+        });
     }
 
     public void insertItem(Item item) {
-        if (item == null) return;
-        // Fix C2: Normalize inputs to prevent duplicates with spaces or casing
-        String normalizedName = item.getName().trim();
-        String normalizedSku = item.getSku() != null ? item.getSku().trim().toUpperCase() : "";
-        item.setName(normalizedName);
-        item.setSku(normalizedSku);
+        if (item == null || item.getOwnerId() == null) return;
+
+        String name = item.getName().trim();
+        String sku = (item.getSku() != null) ? item.getSku().trim().toUpperCase() : "";
+        item.setName(name);
+        item.setSku(sku);
 
         AppDatabase.databaseWriteExecutor.execute(() -> {
-            Item existing = mItemDao.getItemBySkuAndName(item.getOwnerId(), normalizedSku, normalizedName);
+            Item existing = mItemDao.getItemBySkuAndName(item.getOwnerId(), sku, name);
             if (existing != null) {
                 updateItemQuantity(existing, item.getQuantity());
             } else {
@@ -169,6 +182,7 @@ public class ItemRepository {
                 mFirestore.collection("items").document(id).set(item);
                 recordTransaction("ADD", item, item.getQuantity());
             }
+            
             ProductTemplate pt = new ProductTemplate(item.getName(), item.getSku(), item.getPrice(), item.getOwnerId(), item.getBrand());
             pt.setLowStockThreshold(item.getLowStockThreshold());
             upsertTemplate(pt);
@@ -209,18 +223,6 @@ public class ItemRepository {
         });
     }
 
-    public void updateItem(Item item, int oldQty) {
-        if (item == null) return;
-        AppDatabase.databaseWriteExecutor.execute(() -> {
-            mItemDao.update(item); 
-            if (item.getFirestoreId() != null) {
-                mFirestore.collection("items").document(item.getFirestoreId()).set(item, SetOptions.merge());
-            }
-            int diff = item.getQuantity() - oldQty;
-            if (diff != 0) recordTransaction(diff > 0 ? "UPDATE_PLUS" : "UPDATE_MINUS", item, Math.abs(diff));
-        });
-    }
-
     public void logoutOnly(Runnable onComplete) {
         if (userListener != null) userListener.remove();
         if (inventoryListener != null) inventoryListener.remove();
@@ -231,15 +233,13 @@ public class ItemRepository {
         if (onComplete != null) onComplete.run();
     }
 
-    /**
-     * TOTAL WIPE with Rollback simulation & Failure handling (Fix C5).
-     */
     public void logoutAndReset(Runnable onComplete, java.util.function.Consumer<String> onError) {
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
         if (user == null) { logoutOnly(onComplete); return; }
         
         String uid = user.getUid();
         
+        // Sequential wipe of user data
         wipeCollection("items", "ownerId", uid, () -> {
             wipeCollection("product_templates", "ownerId", uid, () -> {
                 wipeCollection("transactions", "ownerId", uid, () -> {
@@ -251,13 +251,13 @@ public class ItemRepository {
                                         mDb.clearAllTables();
                                         logoutOnly(onComplete);
                                     });
-                                } else {
-                                    if (onError != null) onError.accept("מחיקת חשבון נכשלה. ייתכן שנדרשת התחברות מחדש.");
+                                } else if (onError != null) {
+                                    onError.accept("Auth deletion failed - login recently required");
                                 }
                             });
                         })
                         .addOnFailureListener(e -> {
-                            if (onError != null) onError.accept("שגיאה במחיקת פרופיל: " + e.getMessage());
+                            if (onError != null) onError.accept("Reset failed: " + e.getMessage());
                         });
                 });
             });
@@ -265,7 +265,7 @@ public class ItemRepository {
     }
 
     private void wipeCollection(String coll, String field, String val, Runnable next) {
-        mFirestore.collection(coll).whereEqualTo(field, val).get().addOnSuccessListener(snaps -> {
+        mFirestore.collection(coll).whereEqualTo(field, val).limit(500).get().addOnSuccessListener(snaps -> {
             if (snaps.isEmpty()) { next.run(); return; }
             WriteBatch batch = mFirestore.batch();
             for (DocumentSnapshot doc : snaps) batch.delete(doc.getReference());
@@ -280,9 +280,9 @@ public class ItemRepository {
 
         AppDatabase.databaseWriteExecutor.execute(() -> {
             User u = mUserDao.getUserById(uid);
-            double price = Math.max(0, item.getPrice()); // Fix C4
-            Transaction t = new Transaction(type, item.getName(), qty, qty * price, System.currentTimeMillis(), item.getOwnerId(),
-                    u != null ? u.getDisplayName() : "מערכת", u != null ? u.getRole() : "UNKNOWN");
+            double safePrice = Math.max(0, item.getPrice());
+            Transaction t = new Transaction(type, item.getName(), qty, qty * safePrice, System.currentTimeMillis(), item.getOwnerId(), 
+                    u != null ? u.getDisplayName() : "System", u != null ? u.getRole() : "UNKNOWN");
             String tid = mFirestore.collection("transactions").document().getId();
             t.setFirestoreId(tid);
             mTransactionDao.insert(t);

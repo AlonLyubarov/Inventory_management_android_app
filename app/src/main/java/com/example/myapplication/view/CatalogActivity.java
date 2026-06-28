@@ -32,7 +32,6 @@ public class CatalogActivity extends AppCompatActivity {
         viewModel = new ViewModelProvider(this).get(ItemViewModel.class);
         initUI();
 
-        // Reactive: Observe profile to get warehouseId, then observe Catalog
         viewModel.getUserProfile(uid).observe(this, user -> {
             if (user != null) {
                 this.warehouseId = user.getEmployerId();
@@ -65,29 +64,37 @@ public class CatalogActivity extends AppCompatActivity {
             if (warehouseId == null) return;
             String name = editName.getText().toString().trim();
             String sku = editSku.getText().toString().trim();
-            String price = editPrice.getText().toString().trim();
+            String priceStr = editPrice.getText().toString().trim();
 
-            if (name.isEmpty() || sku.isEmpty() || price.isEmpty()) {
-                Toast.makeText(this, "נא למלא את כל השדות", Toast.LENGTH_SHORT).show();
+            if (name.isEmpty() || sku.isEmpty() || priceStr.isEmpty()) {
+                Toast.makeText(this, "All fields required", Toast.LENGTH_SHORT).show();
                 return;
             }
 
             try {
-                ProductTemplate t = new ProductTemplate(name, sku, Double.parseDouble(price), warehouseId, editBrand.getText().toString().trim());
-                t.setLowStockThreshold(editThreshold.getText().toString().isEmpty() ? 0 : Integer.parseInt(editThreshold.getText().toString()));
+                double price = Double.parseDouble(priceStr);
+                int threshold = editThreshold.getText().toString().isEmpty() ? 0 : Integer.parseInt(editThreshold.getText().toString());
+                
+                if (price < 0 || threshold < 0) {
+                    Toast.makeText(this, "Negative values not allowed", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                ProductTemplate t = new ProductTemplate(name, sku, price, warehouseId, editBrand.getText().toString().trim());
+                t.setLowStockThreshold(threshold);
                 
                 viewModel.upsertTemplate(t);
                 editName.setText(""); editSku.setText(""); editBrand.setText(""); editPrice.setText(""); editThreshold.setText("");
             } catch (NumberFormatException e) {
-                Toast.makeText(this, "נא להזין מספרים תקינים", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Invalid number format", Toast.LENGTH_SHORT).show();
             }
         });
 
         adapter.setOnCatalogClickListener(t -> {
             new AlertDialog.Builder(this)
-                    .setMessage("למחוק את " + t.getName() + " מהקטלוג?")
-                    .setPositiveButton("מחק", (d, w) -> viewModel.deleteTemplate(t))
-                    .setNegativeButton("ביטול", null).show();
+                    .setMessage("Delete " + t.getName() + " from catalog?")
+                    .setPositiveButton("Delete", (d, w) -> viewModel.deleteTemplate(t))
+                    .setNegativeButton("Cancel", null).show();
         });
     }
 }

@@ -1,14 +1,17 @@
 package com.example.myapplication.model;
 
 import android.content.Context;
+import androidx.annotation.NonNull;
 import androidx.room.Database;
 import androidx.room.Room;
 import androidx.room.RoomDatabase;
+import androidx.room.migration.Migration;
+import androidx.sqlite.db.SupportSQLiteDatabase;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-@Database(entities = {Item.class, User.class, Transaction.class, ProductTemplate.class}, version = 18, exportSchema = false)
+@Database(entities = {Item.class, User.class, Transaction.class, ProductTemplate.class}, version = 19, exportSchema = false)
 public abstract class AppDatabase extends RoomDatabase {
 
     public abstract ItemDao itemDao();
@@ -22,13 +25,31 @@ public abstract class AppDatabase extends RoomDatabase {
     public static final ExecutorService databaseWriteExecutor =
             Executors.newFixedThreadPool(NUMBER_OF_THREADS);
 
+    // Migration from 17 to 18: Adding firestoreId index
+    static final Migration MIGRATION_17_18 = new Migration(17, 18) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase database) {
+            database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_transactions_table_firestoreId` ON `transactions_table` (`firestoreId`)");
+        }
+    };
+
+    // Migration from 18 to 19: Adding Senior Level SQL Indices for performance
+    static final Migration MIGRATION_18_19 = new Migration(18, 19) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase database) {
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_items_table_ownerId_sku` ON `items_table` (`ownerId`, `sku`)");
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_items_table_ownerId_name` ON `items_table` (`ownerId`, `name`)");
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_table_ownerId_timestamp` ON `transactions_table` (`ownerId`, `timestamp`)");
+        }
+    };
+
     public static AppDatabase getDatabase(final Context context) {
         if (INSTANCE == null) {
             synchronized (AppDatabase.class) {
                 if (INSTANCE == null) {
                     INSTANCE = Room.databaseBuilder(context.getApplicationContext(),
                                     AppDatabase.class, "inventory_database")
-                            .fallbackToDestructiveMigration()
+                            .addMigrations(MIGRATION_17_18, MIGRATION_18_19)
                             .build();
                 }
             }

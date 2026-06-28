@@ -6,7 +6,12 @@ import androidx.room.PrimaryKey;
 import com.google.firebase.firestore.Exclude;
 import com.google.firebase.firestore.IgnoreExtraProperties;
 
-@Entity(tableName = "items_table", indices = {@Index(value = {"firestoreId"}, unique = true)})
+@Entity(tableName = "items_table", 
+        indices = {
+            @Index(value = {"firestoreId"}, unique = true),
+            @Index(value = {"ownerId", "sku"}), //  Optimized for SKU lookups per warehouse
+            @Index(value = {"ownerId", "name"})
+        })
 @IgnoreExtraProperties
 public class Item {
 
@@ -21,8 +26,6 @@ public class Item {
     private String firestoreId;
     private String sku;
     private int lowStockThreshold;
-    
-    // New field for Company/Brand Name
     private String brand;
 
     public Item() {
@@ -47,10 +50,10 @@ public class Item {
     public void setName(String name) { this.name = name; }
     
     public int getQuantity() { return quantity; }
-    public void setQuantity(int quantity) { this.quantity = quantity; }
+    public void setQuantity(int quantity) { this.quantity = Math.max(0, quantity); } // Safe-guard
     
     public double getPrice() { return price; }
-    public void setPrice(double price) { this.price = price; }
+    public void setPrice(double price) { this.price = Math.max(0.0, price); } // Safe-guard
     
     public String getOwnerId() { return ownerId; }
     public void setOwnerId(String ownerId) { this.ownerId = ownerId; }
