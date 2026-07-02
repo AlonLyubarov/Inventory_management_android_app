@@ -88,6 +88,12 @@ public class ManageUsersActivity extends AppCompatActivity {
                     for (QueryDocumentSnapshot doc : snapshots) {
                         User worker = doc.toObject(User.class);
                         
+                        // H3 Fix: Prevent hijacking if user is already assigned to a warehouse
+                        if (worker.getEmployerId() != null && !"PENDING".equals(worker.getEmployerId()) && !worker.getUserId().equals(worker.getEmployerId())) {
+                             Toast.makeText(this, "העובד כבר משוייך למחסן אחר", Toast.LENGTH_LONG).show();
+                             return;
+                        }
+
                         if ("MANAGER".equals(worker.getRole())) {
                             Toast.makeText(this, R.string.error_manager_link, Toast.LENGTH_LONG).show();
                             return;

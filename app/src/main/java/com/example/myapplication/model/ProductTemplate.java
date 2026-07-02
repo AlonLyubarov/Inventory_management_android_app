@@ -15,12 +15,10 @@ public class ProductTemplate {
     
     private String name;
     private String sku;
-    private double defaultPrice;
+    private long priceCents; // H4 Fix: Precise currency
     private String ownerId;
     private String firestoreId;
     private int lowStockThreshold;
-    
-    // New field for Brand Name
     private String brand;
 
     public ProductTemplate() {}
@@ -28,7 +26,7 @@ public class ProductTemplate {
     public ProductTemplate(String name, String sku, double defaultPrice, String ownerId, String brand) {
         this.name = name;
         this.sku = sku;
-        this.defaultPrice = defaultPrice;
+        this.priceCents = Math.round(Math.max(0.0, defaultPrice) * 100);
         this.ownerId = ownerId;
         this.brand = brand;
         this.lowStockThreshold = 0;
@@ -42,8 +40,14 @@ public class ProductTemplate {
     public void setName(String name) { this.name = name; }
     public String getSku() { return sku; }
     public void setSku(String sku) { this.sku = sku; }
-    public double getDefaultPrice() { return defaultPrice; }
-    public void setDefaultPrice(double defaultPrice) { this.defaultPrice = defaultPrice; }
+    
+    public long getPriceCents() { return priceCents; }
+    public void setPriceCents(long priceCents) { this.priceCents = priceCents; }
+
+    @Exclude
+    public double getDefaultPrice() { return priceCents / 100.0; }
+    public void setDefaultPrice(double price) { this.priceCents = Math.round(Math.max(0.0, price) * 100); }
+
     public String getOwnerId() { return ownerId; }
     public void setOwnerId(String ownerId) { this.ownerId = ownerId; }
     public String getFirestoreId() { return firestoreId; }

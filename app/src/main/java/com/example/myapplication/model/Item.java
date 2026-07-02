@@ -9,7 +9,7 @@ import com.google.firebase.firestore.IgnoreExtraProperties;
 @Entity(tableName = "items_table", 
         indices = {
             @Index(value = {"firestoreId"}, unique = true),
-            @Index(value = {"ownerId", "sku"}), //  Optimized for SKU lookups per warehouse
+            @Index(value = {"ownerId", "sku"}),
             @Index(value = {"ownerId", "name"})
         })
 @IgnoreExtraProperties
@@ -19,7 +19,7 @@ public class Item {
     private int id;
 
     private String name;
-    private double price;
+    private long priceCents; // H4 Fix: Precise currency
     private int quantity;
     private String ownerId;
     private long createdAt;
@@ -33,8 +33,8 @@ public class Item {
 
     public Item(String name, double price, int quantity, String ownerId, String sku, String brand) {
         this.name = name;
-        this.price = price;
-        this.quantity = quantity;
+        this.priceCents = Math.round(Math.max(0.0, price) * 100);
+        this.quantity = Math.max(0, quantity);
         this.ownerId = ownerId;
         this.sku = sku;
         this.brand = brand;
@@ -50,10 +50,14 @@ public class Item {
     public void setName(String name) { this.name = name; }
     
     public int getQuantity() { return quantity; }
-    public void setQuantity(int quantity) { this.quantity = Math.max(0, quantity); } // Safe-guard
+    public void setQuantity(int quantity) { this.quantity = Math.max(0, quantity); }
     
-    public double getPrice() { return price; }
-    public void setPrice(double price) { this.price = Math.max(0.0, price); } // Safe-guard
+    public long getPriceCents() { return priceCents; }
+    public void setPriceCents(long priceCents) { this.priceCents = Math.max(0, priceCents); }
+
+    @Exclude
+    public double getPrice() { return priceCents / 100.0; }
+    public void setPrice(double price) { this.priceCents = Math.round(Math.max(0.0, price) * 100); }
     
     public String getOwnerId() { return ownerId; }
     public void setOwnerId(String ownerId) { this.ownerId = ownerId; }

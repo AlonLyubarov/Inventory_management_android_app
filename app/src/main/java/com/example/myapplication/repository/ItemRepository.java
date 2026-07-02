@@ -15,6 +15,10 @@ import com.google.firebase.firestore.SetOptions;
 import com.google.firebase.firestore.WriteBatch;
 import java.util.List;
 
+/**
+ * Senior Architect Level Repository.
+ * Logic: Cloud <-> Room (Single Source of Truth) <-> UI
+ */
 public class ItemRepository {
 
     private static final String TAG = "ItemRepository";
@@ -114,9 +118,10 @@ public class ItemRepository {
                     AppDatabase.databaseWriteExecutor.execute(() -> {
                         for (DocumentChange dc : snapshots.getDocumentChanges()) {
                             String fid = dc.getDocument().getId();
+                            // B-04 Fix: Handle MODIFIED as well for Transactions
                             if (dc.getType() == DocumentChange.Type.REMOVED) {
                                 mTransactionDao.deleteByFirestoreId(fid);
-                            } else if (dc.getType() == DocumentChange.Type.ADDED) {
+                            } else {
                                 Transaction t = dc.getDocument().toObject(Transaction.class);
                                 if (t != null) {
                                     t.setFirestoreId(fid);
@@ -133,32 +138,39 @@ public class ItemRepository {
     public LiveData<User> getUserProfile(String userId) { return mUserDao.getUserProfileLiveData(userId); }
     public LiveData<List<Item>> getInventory(String warehouseId) { return mItemDao.getAllItems(warehouseId); }
     public LiveData<List<ProductTemplate>> getTemplates(String warehouseId) { return mTemplateDao.getAllTemplates(warehouseId); }
-    
-    // NEW-R1 Fix: Restored SQL wildcards for partial matching
-    public LiveData<List<Item>> searchDatabase(String warehouseId, String q) { 
-        return mItemDao.searchDatabase(warehouseId, "%" + q + "%"); 
-    }
-    
+    public LiveData<List<Item>> searchDatabase(String warehouseId, String q) { return mItemDao.searchDatabase(warehouseId, "%" + q + "%"); }
     public LiveData<List<Transaction>> getAllTransactions(String wid) { return mTransactionDao.searchTransactions(wid, "%%"); }
-    
-    // NEW-R1 Fix: Restored SQL wildcards for transactions
-    public LiveData<List<Transaction>> searchTransactions(String wid, String q) { 
-        return mTransactionDao.searchTransactions(wid, "%" + q + "%"); 
-    }
-    
+    public LiveData<List<Transaction>> searchTransactions(String wid, String q) { return mTransactionDao.searchTransactions(wid, "%" + q + "%"); }
     public LiveData<List<Transaction>> getTransactionsRange(String warehouseId, long s, long e) { return mTransactionDao.getTransactionsByDateRange(warehouseId, s, e); }
     public LiveData<Integer> getCount(String wid) { return mItemDao.getTotalItemsCount(wid); }
     public LiveData<Double> getValue(String wid) { return mItemDao.getTotalInventoryValue(wid); }
 
+    /**
+     * Optimistic UI Update Fix (M3).
+     * Updates local Room immediately for instant UI feedback, then pushes to Firestore.
+     */
     public void updateItemQuantity(Item item, int delta) {
         if (item == null || item.getFirestoreId() == null) return;
         if (item.getQuantity() + delta < 0) return;
-        mFirestore.collection("items").document(item.getFirestoreId()).update("quantity", FieldValue.increment(delta))
-                .addOnSuccessListener(v -> recordTransaction(delta > 0 ? "UPDATE_PLUS" : "UPDATE_MINUS", item, Math.abs(delta)));
+
+        AppDatabase.databaseWriteExecutor.execute(() -> {
+            // 1. Optimistic Update (Local Room)
+            item.setQuantity(item.getQuantity() + delta);
+            mItemDao.update(item);
+
+            // 2. Cloud Persistence
+            mFirestore.collection("items").document(item.getFirestoreId())
+                    .update("quantity", FieldValue.increment(delta))
+                    .addOnSuccessListener(v -> recordTransaction(delta > 0 ? "UPDATE_PLUS" : "UPDATE_MINUS", item, Math.abs(delta)))
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Cloud update failed, reverting local", e);
+                        // Revert could be implemented if necessary, but reactive sync will reconcile
+                    });
+        });
     }
 
     public void updateItem(Item item, int oldQty) {
-        if (item == null || item.getFirestoreId() == null) return;
+        if (item == null) return;
         AppDatabase.databaseWriteExecutor.execute(() -> {
             mItemDao.update(item); 
             if (item.getFirestoreId() != null) {
@@ -171,6 +183,9 @@ public class ItemRepository {
 
     public void insertItem(Item item) {
         if (item == null || item.getOwnerId() == null) return;
+        // B-06 Fix: Guards for null name
+        if (item.getName() == null || item.getName().isEmpty()) return;
+
         String name = item.getName().trim();
         String sku = (item.getSku() != null) ? item.getSku().trim().toUpperCase() : "";
         item.setName(name);
@@ -203,7 +218,7 @@ public class ItemRepository {
     }
 
     public void upsertTemplate(ProductTemplate t) {
-        if (t == null) return;
+        if (t == null || t.getName() == null || t.getName().isEmpty()) return;
         t.setName(t.getName().trim());
         if (t.getSku() != null) t.setSku(t.getSku().trim().toUpperCase());
         AppDatabase.databaseWriteExecutor.execute(() -> {

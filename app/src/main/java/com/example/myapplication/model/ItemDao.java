@@ -43,7 +43,6 @@ public interface ItemDao {
     @Query("SELECT * FROM items_table WHERE ownerId = :userId ORDER BY name ASC, firestoreId ASC")
     LiveData<List<Item>> getAllItems(String userId);
 
-    // B-07 Fix: Add ESCAPE '\\' to handle literal % or _ in search
     @Query("SELECT * FROM items_table WHERE ownerId = :userId AND (name LIKE :searchQuery ESCAPE '\\' OR sku LIKE :searchQuery ESCAPE '\\') ORDER BY name ASC")
     LiveData<List<Item>> searchDatabase(String userId, String searchQuery);
 
@@ -59,6 +58,7 @@ public interface ItemDao {
     @Query("SELECT COUNT(*) FROM items_table WHERE ownerId = :userId")
     LiveData<Integer> getTotalItemsCount(String userId);
 
-    @Query("SELECT COALESCE(SUM(price * quantity), 0.0) FROM items_table WHERE ownerId = :userId")
+    // H4 Fix: Sum cents and divide by 100 for display
+    @Query("SELECT COALESCE(SUM(priceCents * quantity), 0) / 100.0 FROM items_table WHERE ownerId = :userId")
     LiveData<Double> getTotalInventoryValue(String userId);
 }

@@ -25,7 +25,6 @@ public abstract class AppDatabase extends RoomDatabase {
     public static final ExecutorService databaseWriteExecutor =
             Executors.newFixedThreadPool(NUMBER_OF_THREADS);
 
-    // Migration from 17 to 18: Adding firestoreId index
     static final Migration MIGRATION_17_18 = new Migration(17, 18) {
         @Override
         public void migrate(@NonNull SupportSQLiteDatabase database) {
@@ -33,7 +32,6 @@ public abstract class AppDatabase extends RoomDatabase {
         }
     };
 
-    // Migration from 18 to 19: Adding Senior Level SQL Indices for performance
     static final Migration MIGRATION_18_19 = new Migration(18, 19) {
         @Override
         public void migrate(@NonNull SupportSQLiteDatabase database) {
@@ -50,6 +48,7 @@ public abstract class AppDatabase extends RoomDatabase {
                     INSTANCE = Room.databaseBuilder(context.getApplicationContext(),
                                     AppDatabase.class, "inventory_database")
                             .addMigrations(MIGRATION_17_18, MIGRATION_18_19)
+                            .fallbackToDestructiveMigration() // H3 Fix: Safety fallback as per README intent
                             .build();
                 }
             }

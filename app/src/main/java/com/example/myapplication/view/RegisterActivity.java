@@ -15,6 +15,10 @@ import com.example.myapplication.model.User;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.SetOptions;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class RegisterActivity extends AppCompatActivity {
 
@@ -37,16 +41,16 @@ public class RegisterActivity extends AppCompatActivity {
         spinnerRoles = findViewById(R.id.spinner_roles);
         Button buttonRegister = findViewById(R.id.button_register);
 
-        String[] roles = {"עובד מחסן", "ראש משמרת", "מנהל מחסן"};
+        // C1 Fix: Remove MANAGER from self-selection list
+        String[] roles = {"עובד מחסן", "ראש משמרת"};
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, roles);
         spinnerRoles.setAdapter(adapter);
 
-        // UI Check: If user already authenticated (via Google or existing Auth), focus on profile completion
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser != null) {
             editTextEmail.setText(currentUser.getEmail());
-            editTextEmail.setEnabled(false); // Lock email
-            editTextPassword.setVisibility(View.GONE); // Password not needed for profile setup
+            editTextEmail.setEnabled(false); 
+            editTextPassword.setVisibility(View.GONE);
         }
 
         buttonRegister.setOnClickListener(v -> {
@@ -61,12 +65,9 @@ public class RegisterActivity extends AppCompatActivity {
                 return;
             }
 
-            // Case A: User is already logged in (Google Flow or Profile Recovery)
             if (mAuth.getCurrentUser() != null) {
-                saveUserToFirestore(mAuth.getUid(), email, name, role);
-            } 
-            // Case B: Traditional new user registration
-            else {
+                saveUserProfile(mAuth.getUid(), email, name, role);
+            } else {
                 if (password.length() < 8) {
                     Toast.makeText(this, "סיסמה חייבת להיות לפחות 8 תווים", Toast.LENGTH_SHORT).show();
                     return;
@@ -74,42 +75,53 @@ public class RegisterActivity extends AppCompatActivity {
                 mAuth.createUserWithEmailAndPassword(email, password)
                         .addOnCompleteListener(this, task -> {
                             if (task.isSuccessful()) {
-                                saveUserToFirestore(mAuth.getUid(), email, name, role);
+                                saveUserProfile(mAuth.getUid(), email, name, role);
                             } else {
-                                Toast.makeText(this, "שגיאה ברישום: " + task.getException().getMessage(), Toast.LENGTH_LONG).show();
+                                String err = task.getException() != null ? task.getException().getMessage() : "Unknown";
+                                Toast.makeText(this, "שגיאה ברישום: " + err, Toast.LENGTH_LONG).show();
                             }
                         });
             }
         });
     }
 
-    private void saveUserToFirestore(String uid, String email, String name, String role) {
-        String employerId = uid;
-        if (!"MANAGER".equals(role)) {
-            employerId = "PENDING";
-        }
+    /**
+     * H1 Fix: Use merge and prevent role escalation for existing users.
+     */
+    private void saveUserProfile(String uid, String email, String name, String role) {
+        mFirestore.collection("users").document(uid).get().addOnSuccessListener(doc -> {
+            Map<String, Object> data = new HashMap<>();
+            data.put("userId", uid);
+            data.put("email", email);
+            data.put("displayName", name);
+            
+            if (!doc.exists()) {
+                // New user: Set initial role and employerId
+                data.put("role", role);
+                data.put("employerId", "PENDING");
+            } else {
+                // H1 Fix: Existing user cannot change their role from this screen
+                Toast.makeText(this, "פרופיל קיים - מעדכן פרטים בסיסיים בלבד", Toast.LENGTH_SHORT).show();
+            }
 
-        User newUser = new User(uid, email, name, role, employerId);
-
-        mFirestore.collection("users").document(uid).set(newUser)
+            mFirestore.collection("users").document(uid).set(data, SetOptions.merge())
                 .addOnSuccessListener(aVoid -> {
-                    Toast.makeText(this, "הפרופיל נוצר בהצלחה", Toast.LENGTH_SHORT).show();
-                    Intent intent = new Intent(this, MainActivity.class);
-                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                    startActivity(intent);
-                    finish();
+                    Toast.makeText(this, R.string.success_profile_created, Toast.LENGTH_SHORT).show();
+                    navigateToMain();
                 })
-                .addOnFailureListener(e -> {
-                    // Fix C5: Error handling for failed profile creation
-                    Toast.makeText(this, "שגיאה ביצירת הפרופיל: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                });
+                .addOnFailureListener(e -> Toast.makeText(this, R.string.error_server_access, Toast.LENGTH_SHORT).show());
+        });
+    }
+
+    private void navigateToMain() {
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
     }
 
     private String mapLabelToRole(String label) {
-        switch (label) {
-            case "ראש משמרת": return "SHIFT_LEADER";
-            case "מנהל מחסן": return "MANAGER";
-            default: return "WORKER";
-        }
+        if ("ראש משמרת".equals(label)) return "SHIFT_LEADER";
+        return "WORKER"; // Default
     }
 }
